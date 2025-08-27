@@ -1,57 +1,49 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { ShoppingCartIcon, Bars3Icon } from "@heroicons/react/24/solid";
 
-function Home() {
+const Header = () => {
   return (
-    <div className="bg-[#cd5c2f] min-h-screen text-white flex items-center justify-center p-8">
-      <div className="container mx-auto flex flex-col md:flex-row items-center justify-center space-y-8 md:space-y-0 md:space-x-12">
-        {/* Bagian Kiri - Teks dan Ikon Chibo */}
-        <div className="text-center md:text-left flex-1">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-4 leading-tight">
-            REVITAMEAL
-          </h1>
-          <p className="text-xl font-light mb-8">Healthy Catering</p>
+    // Bagian utama header dengan latar belakang oranye gelap
+    <header className="bg-orange-800 text-white p-4 flex justify-between items-center">
+      {/* Container untuk menu navigasi di sisi kiri */}
+      <div className="flex items-center space-x-6">
+        {/* Ikon hamburger menu untuk tampilan mobile, akan kita tangani di tahap responsivitas */}
+        <Bars3Icon className="h-6 w-6 cursor-pointer lg:hidden" />
 
-          {/* Tombol Call-to-Action */}
-          <div className="flex justify-center md:justify-start">
-            <Link
-              to="/menu"
-              className="bg-[#e99a2c] text-white font-bold py-3 px-8 rounded-full shadow-lg hover:bg-orange-700 transition-colors"
-            >
-              Pesan Sekarang
-            </Link>
-          </div>
-
-          {/* Ikon Chibo - desktop */}
-          <div className="hidden md:block absolute bottom-8 left-8">
-            <img
-              src="/chibo-icon.png"
-              alt="Chibo AI Assistant"
-              className="w-16 h-16 rounded-full cursor-pointer transition-transform transform hover:scale-110"
-            />
-          </div>
-        </div>
-
-        {/* Bagian Kanan - Gambar */}
-        <div className="flex-1 max-w-sm md:max-w-md">
-          <img
-            src="/hero-tumpeng.png"
-            alt="Delicious Tumpeng Dish"
-            className="w-full h-auto rounded-xl shadow-2xl"
-          />
-        </div>
+        {/* Menu navigasi utama */}
+        <nav className="hidden lg:flex space-x-6">
+          <a href="#" className="hover:text-orange-300 transition-colors">
+            Home
+          </a>
+          <a href="#" className="hover:text-orange-300 transition-colors">
+            Menu
+          </a>
+          <a href="#" className="hover:text-orange-300 transition-colors">
+            Contact
+          </a>
+          <a href="#" className="hover:text-orange-300 transition-colors">
+            About Us
+          </a>
+        </nav>
       </div>
 
-      {/* Ikon Chibo - mobile */}
-      <div className="md:hidden fixed bottom-4 right-4 z-50">
-        <img
-          src="/chibo-icon.png"
-          alt="Chibo AI Assistant"
-          className="w-12 h-12 rounded-full cursor-pointer transition-transform transform hover:scale-110"
-        />
+      {/* Container untuk ikon dan tombol di sisi kanan */}
+      <div className="flex items-center space-x-6">
+        {/* Ikon keranjang belanja */}
+        <ShoppingCartIcon className="h-6 w-6 cursor-pointer hover:text-orange-300 transition-colors" />
+
+        {/* Tombol Sign In */}
+        <button className="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-full transition-colors">
+          Sign In
+        </button>
+
+        {/* Tombol Sign Up */}
+        <button className="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-full transition-colors">
+          Sign Up
+        </button>
       </div>
-    </div>
+    </header>
   );
-}
+};
 
-export default Home;
+export default Header;
