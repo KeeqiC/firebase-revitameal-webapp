@@ -1,52 +1,59 @@
 // src/App.jsx
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-// Halaman Publik
-import Home from "./pages/public/Home";
-import Login from "./pages/auth/Login";
-import Register from "./pages/auth/Register";
+// Menggunakan React.lazy() untuk memuat halaman secara dinamis
+const Home = lazy(() => import("./pages/public/Home"));
+const Login = lazy(() => import("./pages/auth/Login"));
+const Register = lazy(() => import("./pages/auth/Register"));
 
-// Halaman Dashboard (Terproteksi)
-import Dashboard from "./pages/dashboard/Dashboard";
-import LunchBoost from "./pages/dashboard/LunchBoost";
-import CalorieTracker from "./pages/dashboard/CalorieTracker";
-import DietPlanner from "./pages/dashboard/DietPlanner";
-import FoodJournal from "./pages/dashboard/FoodJournal";
-import FitnessGuide from "./pages/dashboard/FitnessGuide";
-import ChiboAssistant from "./pages/dashboard/ChiboAssistant";
-import Profile from "./pages/dashboard/Profile";
-import OrderHistory from "./pages/dashboard/OrderHistory";
+const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
+const LunchBoost = lazy(() => import("./pages/dashboard/LunchBoost"));
+const CalorieTracker = lazy(() => import("./pages/dashboard/CalorieTracker"));
+const DietPlanner = lazy(() => import("./pages/dashboard/DietPlanner"));
+const FoodJournal = lazy(() => import("./pages/dashboard/FoodJournal"));
+const FitnessGuide = lazy(() => import("./pages/dashboard/FitnessGuide"));
+const ChiboAssistant = lazy(() => import("./pages/dashboard/ChiboAssistant"));
+const Profile = lazy(() => import("./pages/dashboard/Profile"));
+const OrderHistory = lazy(() => import("./pages/dashboard/OrderHistory"));
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Rute Publik (Akses bebas) */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Home />} />
-          {/* Halaman publik lain bisa ditambahkan di sini */}
-        </Route>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-
-        {/* Rute Terproteksi (Hanya untuk pengguna login) */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<DashboardLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="lunch-boost" element={<LunchBoost />} />
-            <Route path="calorie-tracker" element={<CalorieTracker />} />
-            <Route path="diet-planner" element={<DietPlanner />} />
-            <Route path="food-journal" element={<FoodJournal />} />
-            <Route path="fitness-guide" element={<FitnessGuide />} />
-            <Route path="chibo" element={<ChiboAssistant />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="order-history" element={<OrderHistory />} />
+      <Suspense
+        fallback={
+          <div className="flex justify-center items-center min-h-screen">
+            <p className="text-xl text-gray-500">Memuat...</p>
+          </div>
+        }
+      >
+        <Routes>
+          {/* Rute Publik */}
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Home />} />
           </Route>
-        </Route>
-      </Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Rute Terproteksi */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<DashboardLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="lunch-boost" element={<LunchBoost />} />
+              <Route path="calorie-tracker" element={<CalorieTracker />} />
+              <Route path="diet-planner" element={<DietPlanner />} />
+              <Route path="food-journal" element={<FoodJournal />} />
+              <Route path="fitness-guide" element={<FitnessGuide />} />
+              <Route path="chibo" element={<ChiboAssistant />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="order-history" element={<OrderHistory />} />
+            </Route>
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

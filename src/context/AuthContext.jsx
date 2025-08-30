@@ -6,13 +6,13 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore"; // Impor doc dan setDoc
-import { auth, db } from "../firebase"; // Pastikan db diimpor
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "../firebase";
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Fungsi untuk mendaftar
@@ -24,7 +24,6 @@ export function AuthProvider({ children }) {
     );
     const user = userCredential.user;
 
-    // Simpan data pengguna ke Firestore
     await setDoc(doc(db, "users", user.uid), {
       email: user.email,
       name: "",
@@ -36,20 +35,17 @@ export function AuthProvider({ children }) {
     return userCredential;
   };
 
-  // Fungsi untuk login
   const login = (email, password) => {
     return signInWithEmailAndPassword(auth, email, password);
   };
 
-  // Fungsi untuk logout
   const logout = () => {
     return signOut(auth);
   };
 
-  // Memeriksa status otentikasi saat aplikasi dimuat
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
       setLoading(false);
     });
     return () => {
@@ -58,7 +54,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = {
-    user,
+    currentUser,
     signup,
     login,
     logout,

@@ -25,24 +25,25 @@ import {
 
 import TikTokIcon from "../../components/Icons/TikTokIcon";
 import heroImage from "../../assets/tumpeng.png";
-import phoneImage from "../../assets/phone.png";
+import phone1Image from "../../assets/phone1.png";
+import phone2Image from "../../assets/phone2.png";
 
 function Home() {
   return (
     <div className="min-h-screen bg-[#F27F34] text-white">
       {/* Hero Section */}
-      <section className="relative h-screen flex flex-col items-center justify-center text-center p-8">
+      <section className="relative h-screen flex items-center justify-center p-8 md:p-12">
         <div className="absolute inset-0 bg-[#B23501] opacity-60"></div>
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between w-full max-w-7xl mx-auto">
-          <div className="text-left mb-8 md:mb-0">
-            <h1 className="text-6xl md:text-8xl font-black tracking-wide leading-none">
+        <div className="relative z-10 w-full max-w-7xl mx-auto flex flex-col-reverse md:flex-row items-center justify-between">
+          <div className="text-center md:text-left">
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-wide leading-tight">
               REVITAMEAL
             </h1>
             <h2 className="text-xl md:text-2xl mt-2 font-light">
-              Healthy Catering
+              Good Food Good Mood No Plastic
             </h2>
           </div>
-          <div className="md:w-1/2">
+          <div className="w-full md:w-1/2 mt-8 md:mt-0">
             <img
               src={heroImage}
               alt="Tumpeng Sehat"
@@ -53,9 +54,9 @@ function Home() {
       </section>
 
       {/* About Section */}
-      <section id="about" className="py-20 px-4 bg-[#B23501]">
+      <section id="about" className="py-20 px-4 md:px-8 bg-[#B23501]">
         <div className="container mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-12">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-12">
             About Revitameal
           </h2>
           <p className="text-center text-lg max-w-4xl mx-auto mb-16">
@@ -68,13 +69,13 @@ function Home() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-20">
-            <div className="bg-[#F27F34] p-8 rounded-xl shadow-lg flex flex-col md:flex-row items-center gap-6">
+            <div className="bg-[#F27F34] p-8 rounded-xl shadow-lg flex flex-col lg:flex-row items-center gap-6">
               <img
-                src={phoneImage}
+                src={phone1Image}
                 alt="Pelayanan Program Korporat"
-                className="w-full md:w-1/2 rounded-lg"
+                className="w-full lg:w-1/2 rounded-lg"
               />
-              <div className="text-center md:text-left">
+              <div className="text-center lg:text-left">
                 <h3 className="text-2xl font-semibold mb-2">
                   Pelayanan Program Korporat dan Komunitas
                 </h3>
@@ -84,13 +85,13 @@ function Home() {
                 </p>
               </div>
             </div>
-            <div className="bg-[#F27F34] p-8 rounded-xl shadow-lg flex flex-col md:flex-row items-center gap-6">
+            <div className="bg-[#F27F34] p-8 rounded-xl shadow-lg flex flex-col lg:flex-row items-center gap-6">
               <img
-                src={phoneImage}
-                alt="Harga Terjangkau"
-                className="w-full md:w-1/2 rounded-lg"
+                src={phone2Image}
+                alt="Pelayanan Program Korporat"
+                className="w-full lg:w-1/2 rounded-lg"
               />
-              <div className="text-center md:text-left">
+              <div className="text-center lg:text-left">
                 <h3 className="text-2xl font-semibold mb-2">
                   Harga Terjangkau
                 </h3>
@@ -106,6 +107,7 @@ function Home() {
             Kenapa harus Revitameal?
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            {/* ... bagian ikon ... */}
             <div className="flex flex-col items-center">
               <Award className="h-10 w-10 mb-2 text-[#FFD580]" />
               <p className="font-semibold">Berdiri Sejak 2019</p>
@@ -153,10 +155,10 @@ function Home() {
       {/* Contact Section */}
       <section
         id="contact"
-        className="py-20 px-4 bg-[#B23501]/80 backdrop-blur-md"
+        className="py-20 px-4 md:px-8 bg-[#B23501]/80 backdrop-blur-md"
       >
         <div className="container mx-auto max-w-2xl">
-          <div className="bg-[#F27F34]/30 backdrop-blur-md p-10 rounded-xl shadow-2xl border border-white/20">
+          <div className="bg-[#F27F34]/30 backdrop-blur-md p-6 md:p-10 rounded-xl shadow-2xl border border-white/20">
             <h3 className="text-3xl font-bold text-center mb-8">
               Hubungi Kami
             </h3>

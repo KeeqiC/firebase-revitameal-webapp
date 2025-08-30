@@ -11,7 +11,9 @@ function Navbar() {
           <Link to="/" className="text-2xl font-bold">
             REVITAMEAL
           </Link>
-          <div className="text-sm text-white/80">Healthy Catering</div>
+          <div className="text-sm text-white/80 hidden sm:block">
+            Good Food Good Mood No Plastic
+          </div>
         </div>
 
         {/* Navigasi untuk Halaman Publik */}
@@ -43,28 +45,28 @@ function Navbar() {
         </ul>
 
         {/* Tombol Cart, Login & Register */}
-        <ul className="flex space-x-4 items-center">
-          <li>
+        <ul className="flex space-x-2 sm:space-x-4 items-center">
+          {/* <li>
             <Link to="/cart" className="hover:text-[#FFD580] transition-colors">
               <ShoppingCart className="h-6 w-6" />
             </Link>
-          </li>
+          </li> */}
           <li>
             <Link
               to="/login"
-              className="bg-gradient-to-r from-[#F9A03F] to-[#F6B049] px-4 py-2 rounded-full shadow-lg hover:scale-105 transform transition duration-200 flex items-center space-x-2 text-sm font-medium"
+              className="bg-gradient-to-r from-[#F9A03F] to-[#F6B049] px-4 py-2 rounded-full shadow-lg hover:scale-105 transform transition duration-200 flex items-center space-x-1 sm:space-x-2 text-sm font-medium"
             >
               <User className="h-4 w-4" />
-              <span>Login</span>
+              <span className="hidden sm:inline">Login</span>
             </Link>
           </li>
           <li>
             <Link
               to="/register"
-              className="bg-gradient-to-r from-[#F9A03F] to-[#F6B049] px-4 py-2 rounded-full shadow-lg hover:scale-105 transform transition duration-200 flex items-center space-x-2 text-sm font-medium"
+              className="bg-gradient-to-r from-[#F9A03F] to-[#F6B049] px-4 py-2 rounded-full shadow-lg hover:scale-105 transform transition duration-200 flex items-center space-x-1 sm:space-x-2 text-sm font-medium"
             >
               <UserPlus className="h-4 w-4" />
-              <span>Register</span>
+              <span className="hidden sm:inline">Daftar</span>
             </Link>
           </li>
         </ul>

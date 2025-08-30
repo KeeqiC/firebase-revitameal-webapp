@@ -1,208 +1,233 @@
 // src/pages/dashboard/CalorieTracker.jsx
-import { useState } from "react";
-import { PlusCircle, Utensils, Flame, Leaf, Fish, Heart } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { db } from "../../firebase";
+import {
+  doc,
+  setDoc,
+  collection,
+  query,
+  onSnapshot,
+  getDoc,
+  addDoc,
+  orderBy,
+  serverTimestamp,
+} from "firebase/firestore";
+import { Plus } from "lucide-react";
+import { format } from "date-fns";
+import { id } from "date-fns/locale";
 
 function CalorieTracker() {
-  const [foodEntry, setFoodEntry] = useState({
-    name: "",
-    calories: "",
-    protein: "",
-    carbs: "",
-    fats: "",
-  });
+  const { currentUser } = useAuth();
+  const [targetCalories, setTargetCalories] = useState(0);
+  const [totalCalories, setTotalCalories] = useState(0);
+  const [totalProtein, setTotalProtein] = useState(0);
+  const [totalCarbs, setTotalCarbs] = useState(0);
+  const [totalFats, setTotalFats] = useState(0);
+  const [consumedMeals, setConsumedMeals] = useState([]);
+  const [selectedMeal, setSelectedMeal] = useState("");
+  const [menuData, setMenuData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Data dummy untuk ringkasan harian
-  const dailySummary = {
-    calories: 1250,
-    protein: 60,
-    carbs: 150,
-    fats: 45,
-    targetCalories: 2000,
-  };
+  const today = format(new Date(), "yyyy-MM-dd", { locale: id });
+  const logDocRef = doc(db, "users", currentUser.uid, "dailyLogs", today);
+  const mealsCollectionRef = collection(logDocRef, "meals");
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFoodEntry((prev) => ({ ...prev, [name]: value }));
-  };
+  useEffect(() => {
+    // Ambil target kalori dari profil pengguna
+    const fetchTargetCalories = async () => {
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const docSnap = await getDoc(userDocRef);
+      if (docSnap.exists()) {
+        setTargetCalories(docSnap.data().targetCalories || 0);
+      }
+    };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Logic untuk menambahkan data ke state global atau database
-    console.log("Makanan Ditambahkan:", foodEntry);
-    setFoodEntry({
-      name: "",
-      calories: "",
-      protein: "",
-      carbs: "",
-      fats: "",
+    // Ambil data menu dari koleksi lunchBoostMenu
+    const fetchMenuData = onSnapshot(
+      query(collection(db, "lunchBoostMenu"), orderBy("name")),
+      (snapshot) => {
+        const menu = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setMenuData(menu);
+      }
+    );
+
+    // Ambil data total kalori dan makro dari dailyLogs
+    const unsubDailyLogs = onSnapshot(logDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setTotalCalories(data.totalCalories || 0);
+        setTotalProtein(data.totalProtein || 0);
+        setTotalCarbs(data.totalCarbs || 0);
+        setTotalFats(data.totalFats || 0);
+      } else {
+        setTotalCalories(0);
+        setTotalProtein(0);
+        setTotalCarbs(0);
+        setTotalFats(0);
+      }
+      setLoading(false);
     });
+
+    // Ambil daftar makanan yang sudah dicatat
+    const unsubMeals = onSnapshot(query(mealsCollectionRef), (snapshot) => {
+      const meals = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+      setConsumedMeals(meals);
+    });
+
+    fetchTargetCalories();
+
+    return () => {
+      unsubDailyLogs();
+      unsubMeals();
+      fetchMenuData();
+    };
+  }, [currentUser, logDocRef, mealsCollectionRef]);
+
+  const addMeal = async (e) => {
+    e.preventDefault();
+    if (!selectedMeal) return;
+
+    const meal = menuData.find((m) => m.name === selectedMeal);
+    if (!meal) return;
+
+    try {
+      // Menambahkan total kalori dan makro ke dokumen dailyLogs
+      await setDoc(
+        logDocRef,
+        {
+          totalCalories: totalCalories + meal.calories,
+          totalProtein: totalProtein + (meal.protein || 0),
+          totalCarbs: totalCarbs + (meal.carbs || 0),
+          totalFats: totalFats + (meal.fats || 0),
+        },
+        { merge: true }
+      );
+
+      // Menambahkan makanan ke sub-koleksi 'meals'
+      await addDoc(mealsCollectionRef, {
+        name: meal.name,
+        calories: meal.calories,
+        protein: meal.protein || 0,
+        carbs: meal.carbs || 0,
+        fats: meal.fats || 0,
+        timestamp: serverTimestamp(),
+      });
+
+      setSelectedMeal("");
+    } catch (error) {
+      console.error("Error adding meal:", error);
+      alert("Gagal menambahkan makanan.");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <p className="text-xl text-gray-500">Memuat data kalori...</p>
+      </div>
+    );
+  }
+
+  const remainingCalories = targetCalories - totalCalories;
 
   return (
-    <div className="p-6 md:p-8">
-      {/* Header Halaman */}
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-        Kalori Tracker
-      </h1>
-      <p className="text-gray-600 mb-8">
-        Catat makanan Anda dan pantau asupan kalori serta nutrisi harian.
-      </p>
+    <div className="p-6">
+      <h2 className="text-3xl font-bold mb-6">Kalori Tracker</h2>
 
-      {/* Formulir Input Makanan */}
-      <section className="bg-white p-6 rounded-xl shadow-lg mb-8">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">
-          Tambah Makanan Hari Ini
-        </h2>
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Nama Makanan
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={foodEntry.name}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-              placeholder="Contoh: Nasi Goreng"
-              required
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="calories"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Kalori (kcal)
-            </label>
-            <input
-              type="number"
-              id="calories"
-              name="calories"
-              value={foodEntry.calories}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-              placeholder="Jumlah kalori"
-              required
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="protein"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Protein (g)
-            </label>
-            <input
-              type="number"
-              id="protein"
-              name="protein"
-              value={foodEntry.protein}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-              placeholder="Gram protein"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="carbs"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Karbohidrat (g)
-            </label>
-            <input
-              type="number"
-              id="carbs"
-              name="carbs"
-              value={foodEntry.carbs}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-              placeholder="Gram karbohidrat"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="fats"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Lemak (g)
-            </label>
-            <input
-              type="number"
-              id="fats"
-              name="fats"
-              value={foodEntry.fats}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-              placeholder="Gram lemak"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              className="w-full bg-[#B23501] text-white py-2.5 rounded-lg font-semibold hover:bg-[#F9A03F] transition-colors duration-200 flex items-center justify-center space-x-2 mt-4 md:mt-0"
-            >
-              <PlusCircle className="h-5 w-5" />
-              <span>Tambah</span>
-            </button>
-          </div>
+      {/* Ringkasan Kalori & Makro */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-lg p-6 shadow-md flex flex-col items-center justify-center text-center">
+          <p className="text-gray-500 font-medium">Kalori Terkonsumsi</p>
+          <p className="text-4xl font-bold text-orange-500 mt-2">
+            {totalCalories} kcal
+          </p>
+        </div>
+        <div className="bg-white rounded-lg p-6 shadow-md flex flex-col items-center justify-center text-center">
+          <p className="text-gray-500 font-medium">Target Kalori</p>
+          <p className="text-4xl font-bold text-gray-800 mt-2">
+            {targetCalories} kcal
+          </p>
+        </div>
+        <div className="bg-white rounded-lg p-6 shadow-md flex flex-col items-center justify-center text-center">
+          <p className="text-gray-500 font-medium">Sisa Kalori</p>
+          <p
+            className={`text-4xl font-bold mt-2 ${
+              remainingCalories >= 0 ? "text-green-500" : "text-red-500"
+            }`}
+          >
+            {remainingCalories} kcal
+          </p>
+        </div>
+      </div>
+
+      {/* Form Tambah Makanan */}
+      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+        <h3 className="text-xl font-semibold mb-4">Catat Makanan Hari Ini</h3>
+        <form onSubmit={addMeal} className="flex flex-col sm:flex-row gap-4">
+          <select
+            value={selectedMeal}
+            onChange={(e) => setSelectedMeal(e.target.value)}
+            className="flex-1 border border-gray-300 p-2 rounded-md"
+          >
+            <option value="" disabled>
+              Pilih Makanan
+            </option>
+            {menuData.map((meal) => (
+              <option key={meal.id} value={meal.name}>
+                {meal.name} - {meal.calories} kcal
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="bg-orange-500 text-white px-6 py-2 rounded-md font-semibold hover:bg-orange-600 transition-colors flex items-center justify-center"
+          >
+            <Plus className="mr-2" />
+            Tambah
+          </button>
         </form>
-      </section>
+      </div>
 
-      {/* Ringkasan Harian */}
-      <section className="bg-white p-6 rounded-xl shadow-lg">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">
-          Ringkasan Harian
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          <div className="flex flex-col items-center">
-            <div className="bg-[#F27F34]/20 p-4 rounded-full mb-2">
-              <Flame className="h-10 w-10 text-[#B23501]" />
-            </div>
-            <p className="text-sm font-semibold text-gray-600">Kalori</p>
-            <span className="text-xl font-bold text-[#34B26A]">
-              {dailySummary.calories} / {dailySummary.targetCalories} kcal
-            </span>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className="bg-[#F27F34]/20 p-4 rounded-full mb-2">
-              <Fish className="h-10 w-10 text-[#B23501]" />
-            </div>
-            <p className="text-sm font-semibold text-gray-600">Protein</p>
-            <span className="text-xl font-bold">{dailySummary.protein} g</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className="bg-[#F27F34]/20 p-4 rounded-full mb-2">
-              <Leaf className="h-10 w-10 text-[#B23501]" />
-            </div>
-            <p className="text-sm font-semibold text-gray-600">Karbohidrat</p>
-            <span className="text-xl font-bold">{dailySummary.carbs} g</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className="bg-[#F27F34]/20 p-4 rounded-full mb-2">
-              <Heart className="h-10 w-10 text-[#B23501]" />
-            </div>
-            <p className="text-sm font-semibold text-gray-600">Lemak</p>
-            <span className="text-xl font-bold">{dailySummary.fats} g</span>
-          </div>
-        </div>
-        {/* Placeholder untuk riwayat makanan atau grafik */}
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Riwayat Makanan
-          </h3>
-          <div className="text-gray-500 text-center py-10 border border-gray-200 rounded-lg">
-            Riwayat makanan yang dicatat akan muncul di sini.
-          </div>
-        </div>
-      </section>
+      {/* Riwayat Makanan Hari Ini */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h3 className="text-xl font-semibold mb-4">
+          Riwayat Makanan ({today})
+        </h3>
+        {consumedMeals.length > 0 ? (
+          <ul className="space-y-4">
+            {consumedMeals.map((meal) => (
+              <li
+                key={meal.id}
+                className="flex justify-between items-center bg-gray-50 p-4 rounded-md"
+              >
+                <div>
+                  <p className="font-medium">{meal.name}</p>
+                  <p className="text-sm text-gray-500">{meal.calories} kcal</p>
+                </div>
+                <div className="text-xs text-gray-400">
+                  {meal.timestamp
+                    ?.toDate()
+                    .toLocaleTimeString("id-ID", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-500 italic">
+            Belum ada makanan yang dicatat hari ini.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

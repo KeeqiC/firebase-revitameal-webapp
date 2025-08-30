@@ -1,31 +1,45 @@
 // src/pages/dashboard/FoodJournal.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PlusCircle, Camera, FileText } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { db } from "../../firebase";
+import {
+  collection,
+  query,
+  onSnapshot,
+  doc,
+  serverTimestamp,
+  addDoc,
+} from "firebase/firestore";
 
 function FoodJournal() {
+  const { currentUser } = useAuth();
   const [journalEntry, setJournalEntry] = useState({
     name: "",
     time: "",
     photo: null,
   });
+  const [journalHistory, setJournalHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [journalHistory, setJournalHistory] = useState([
-    // Data dummy untuk riwayat
-    {
-      id: 1,
-      name: "Salad Ayam",
-      time: "12:30 PM",
-      date: "28/11/2024",
-      photoUrl: "https://via.placeholder.com/150x150.png?text=Salad",
-    },
-    {
-      id: 2,
-      name: "Smoothie Pisang",
-      time: "08:00 AM",
-      date: "28/11/2024",
-      photoUrl: "https://via.placeholder.com/150x150.png?text=Smoothie",
-    },
-  ]);
+  // Ambil data riwayat jurnal secara real-time
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const journalRef = collection(db, "users", currentUser.uid, "foodJournal");
+    const q = query(journalRef);
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const entries = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+      setJournalHistory(entries);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,39 +50,58 @@ function FoodJournal() {
     setJournalEntry((prev) => ({ ...prev, photo: e.target.files[0] }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Logic untuk mengunggah foto dan menyimpan data ke database
-    console.log("Jurnal Ditambahkan:", journalEntry);
-    setJournalHistory((prev) => [
-      ...prev,
-      {
-        id: prev.length + 1,
+    if (!currentUser) return;
+
+    try {
+      const journalRef = collection(
+        db,
+        "users",
+        currentUser.uid,
+        "foodJournal"
+      );
+      await addDoc(journalRef, {
         name: journalEntry.name,
-        time: "Sekarang", // Ganti dengan waktu asli
-        date: "Hari ini", // Ganti dengan tanggal asli
+        time: journalEntry.time,
+        timestamp: serverTimestamp(),
+        // Unggah foto ke Firebase Storage akan ditambahkan di sini
         photoUrl: journalEntry.photo
           ? URL.createObjectURL(journalEntry.photo)
           : null,
-      },
-    ]);
-    // Reset form
-    setJournalEntry({
-      name: "",
-      time: "",
-      photo: null,
-    });
+      });
+
+      // Reset form
+      setJournalEntry({
+        name: "",
+        time: "",
+        photo: null,
+      });
+    } catch (error) {
+      console.error("Gagal menambahkan entri jurnal:", error);
+      alert("Gagal menambahkan entri jurnal.");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <p className="text-xl text-gray-500">Memuat riwayat jurnal...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8">
       {/* Header Halaman */}
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-        Food Journal
-      </h1>
-      <p className="text-gray-600 mb-8">
-        Catat apa yang Anda makan dan perhatikan pola makan Anda.
-      </p>
+      <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
+          Food Journal
+        </h1>
+        <p className="text-gray-600">
+          Catat apa yang Anda makan dan perhatikan pola makan Anda.
+        </p>
+      </div>
 
       {/* Formulir Catatan */}
       <section className="bg-white p-6 rounded-xl shadow-lg mb-8">
@@ -169,7 +202,12 @@ function FoodJournal() {
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-800">{entry.name}</h3>
                   <p className="text-sm text-gray-500">
-                    {entry.date} - {entry.time}
+                    {entry.timestamp?.toDate().toLocaleString("id-ID", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </p>
                 </div>
                 <FileText className="h-6 w-6 text-[#B23501] flex-shrink-0" />

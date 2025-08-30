@@ -1,48 +1,42 @@
 // src/pages/dashboard/LunchBoost.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShoppingCart, X, Heart } from "lucide-react";
-
-// Data dummy untuk menu
-const menuData = [
-  {
-    id: 1,
-    name: "Salad Ayam Panggang",
-    description: "Salad segar dengan potongan ayam panggang protein tinggi.",
-    calories: 350,
-    price: 45000,
-    category: ["low-carb", "protein", "diet"],
-    image: "https://via.placeholder.com/400x300.png?text=Salad+Ayam",
-    options: ["tanpa saus", "dengan keju feta"],
-  },
-  {
-    id: 2,
-    name: "Salmon Panggang Keto",
-    description: "Ikan salmon panggang dengan sayuran, cocok untuk diet keto.",
-    calories: 480,
-    price: 50000,
-    category: ["keto", "low-carb", "protein"],
-    image: "https://via.placeholder.com/400x300.png?text=Salmon+Keto",
-    options: ["tambahan lemon", "saus pedas"],
-  },
-  {
-    id: 3,
-    name: "Tofu Kari Vegetarian",
-    description: "Tahu lembut dimasak dengan bumbu kari kaya rempah.",
-    calories: 420,
-    price: 40000,
-    category: ["vegetarian", "low-carb"],
-    image: "https://via.placeholder.com/400x300.png?text=Tofu+Kari",
-    options: ["tanpa nasi", "dengan nasi merah"],
-  },
-];
+import { useAuth } from "../../context/AuthContext";
+import { db } from "../../firebase";
+import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 
 function LunchBoost() {
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [menuData, setMenuData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedType, setSelectedType] = useState("all");
   const [cartItems, setCartItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  useEffect(() => {
+    const q = query(collection(db, "lunchBoostMen")); // Menghapus orderBy("name")
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        console.log("snapshot docs:", snapshot.docs.length);
+        const menu = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setMenuData(menu);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching menu:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Kode ini dipindahkan ke sini agar bisa diakses di JSX
   const filteredMenu = menuData.filter((menu) =>
-    selectedCategory === "all" ? true : menu.category.includes(selectedCategory)
+    selectedType === "all" ? true : menu.type === selectedType
   );
 
   const addToCart = (menu) => {
@@ -72,14 +66,6 @@ function LunchBoost() {
     );
   };
 
-  const updateCustomization = (menuId, newCustomization) => {
-    setCartItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === menuId ? { ...item, customization: newCustomization } : item
-      )
-    );
-  };
-
   const handleCheckout = () => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -88,19 +74,16 @@ function LunchBoost() {
     let message = "Halo Revitameal, saya ingin memesan:\n\n";
 
     cartItems.forEach((item, index) => {
-      message += `${index + 1}. ${item.name} (${item.calories} kcal)\n`;
+      message += `${index + 1}. ${item.name}\n`;
       message += `   Jumlah: ${item.quantity} x Rp${item.price.toLocaleString(
         "id-ID"
       )}\n`;
-      if (item.customization) {
-        message += `   Kustomisasi: ${item.customization}\n`;
-      }
     });
 
     message += `\nTotal: Rp${total.toLocaleString("id-ID")}\n\n`;
     message += "Mohon konfirmasi pesanan saya. Terima kasih!";
 
-    const whatsappUrl = `https://wa.me/+6285123099276?text=${encodeURIComponent(
+    const whatsappUrl = `https://wa.me/62895123223141?text=${encodeURIComponent(
       message
     )}`;
     window.open(whatsappUrl, "_blank");
@@ -110,6 +93,14 @@ function LunchBoost() {
     (sum, item) => sum + item.price * item.quantity,
     0
   );
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <p className="text-xl text-gray-500">Memuat menu...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8">
@@ -134,21 +125,19 @@ function LunchBoost() {
 
       {/* Filter Kategori */}
       <div className="flex flex-wrap gap-3 mb-8">
-        {["all", "low-carb", "keto", "vegetarian", "protein"].map(
-          (category) => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-full font-semibold capitalize transition-colors duration-200 ${
-                selectedCategory === category
-                  ? "bg-[#F27F34] text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              {category === "all" ? "Semua Menu" : category}
-            </button>
-          )
-        )}
+        {["all", "menu-andalan", "sayuran-sehat"].map((type) => (
+          <button
+            key={type}
+            onClick={() => setSelectedType(type)}
+            className={`px-4 py-2 rounded-full font-semibold capitalize transition-colors duration-200 ${
+              selectedType === type
+                ? "bg-[#F27F34] text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            {type === "all" ? "Semua Menu" : type.replace("-", " ")}
+          </button>
+        ))}
       </div>
 
       {/* Daftar Menu */}
@@ -161,7 +150,7 @@ function LunchBoost() {
             >
               <div className="relative h-48">
                 <img
-                  src={menu.image}
+                  src={menu.image_url}
                   alt={menu.name}
                   className="w-full h-full object-cover"
                 />
@@ -176,18 +165,9 @@ function LunchBoost() {
                   </span>
                 </div>
                 <p className="text-gray-500 text-sm mb-4 flex-1">
-                  {menu.description}
+                  {menu.description || "Menu lezat dan sehat untuk Anda!"}
                 </p>
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {menu.category.map((cat) => (
-                    <span
-                      key={cat}
-                      className="px-2 py-1 text-xs font-semibold text-[#B23501] bg-[#F27F34]/20 rounded-full capitalize"
-                    >
-                      {cat}
-                    </span>
-                  ))}
-                </div>
+
                 <div className="mt-auto">
                   <button
                     onClick={() => addToCart(menu)}
@@ -232,7 +212,7 @@ function LunchBoost() {
                   {cartItems.map((item) => (
                     <div key={item.id} className="flex items-center space-x-4">
                       <img
-                        src={item.image}
+                        src={item.image_url}
                         alt={item.name}
                         className="w-16 h-16 rounded-lg object-cover"
                       />
@@ -240,9 +220,6 @@ function LunchBoost() {
                         <h3 className="font-semibold text-gray-800">
                           {item.name}
                         </h3>
-                        <p className="text-sm text-gray-500">
-                          Rp{item.price.toLocaleString("id-ID")}
-                        </p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <input
