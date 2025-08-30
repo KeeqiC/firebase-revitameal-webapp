@@ -24,7 +24,10 @@ function FoodJournal() {
 
   // Ambil data riwayat jurnal secara real-time
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
 
     const journalRef = collection(db, "users", currentUser.uid, "foodJournal");
     const q = query(journalRef);
@@ -200,7 +203,7 @@ function FoodJournal() {
                   />
                 )}
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-800">{entry.name}</h3>
+                  <p className="font-medium text-gray-800">{entry.name}</p>
                   <p className="text-sm text-gray-500">
                     {entry.timestamp?.toDate().toLocaleString("id-ID", {
                       day: "numeric",
@@ -210,7 +213,6 @@ function FoodJournal() {
                     })}
                   </p>
                 </div>
-                <FileText className="h-6 w-6 text-[#B23501] flex-shrink-0" />
               </div>
             ))
           ) : (

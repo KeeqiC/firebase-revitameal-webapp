@@ -6,7 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 
 function Profile() {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const [profile, setProfile] = useState({
     name: "",
     email: "",
@@ -20,8 +20,8 @@ function Profile() {
   // Ambil data profil dari Firestore saat komponen dimuat
   useEffect(() => {
     const fetchProfile = async () => {
-      if (user) {
-        const docRef = doc(db, "users", user.uid);
+      if (currentUser) {
+        const docRef = doc(db, "users", currentUser.uid);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
@@ -34,7 +34,7 @@ function Profile() {
     };
 
     fetchProfile();
-  }, [user]);
+  }, [currentUser]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -43,10 +43,10 @@ function Profile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user) return;
+    if (!currentUser) return;
 
     try {
-      const docRef = doc(db, "users", user.uid);
+      const docRef = doc(db, "users", currentUser.uid);
       await updateDoc(docRef, profile);
       alert("Profil berhasil diperbarui!");
     } catch (err) {
@@ -109,7 +109,7 @@ function Profile() {
               type="email"
               id="email"
               name="email"
-              value={user.email}
+              value={currentUser?.email || ""} // Perbaikan di sini
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
               disabled
             />
@@ -174,9 +174,11 @@ function Profile() {
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
             >
               <option value="">Pilih Tujuan</option>
-              <option value="weight-loss">Menurunkan Berat Badan</option>
-              <option value="muscle-gain">Menambah Massa Otot</option>
-              <option value="healthy-living">Gaya Hidup Sehat</option>
+              <option value="Menurunkan Berat Badan">
+                Menurunkan Berat Badan
+              </option>
+              <option value="Menambah Massa Otot">Menambah Massa Otot</option>
+              <option value="Gaya Hidup Sehat">Gaya Hidup Sehat</option>
             </select>
           </div>
           <div>

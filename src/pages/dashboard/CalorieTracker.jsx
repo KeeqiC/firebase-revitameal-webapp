@@ -13,7 +13,7 @@ import {
   orderBy,
   serverTimestamp,
 } from "firebase/firestore";
-import { Plus } from "lucide-react";
+import { Plus, Utensils, Flame, Leaf, Fish, Heart } from "lucide-react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 
@@ -30,28 +30,35 @@ function CalorieTracker() {
   const [loading, setLoading] = useState(true);
 
   const today = format(new Date(), "yyyy-MM-dd", { locale: id });
-  const logDocRef = doc(db, "users", currentUser.uid, "dailyLogs", today);
-  const mealsCollectionRef = collection(logDocRef, "meals");
 
   useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    const logDocRef = doc(db, "users", currentUser.uid, "dailyLogs", today);
+    const mealsCollectionRef = collection(logDocRef, "meals");
+
     // Ambil target kalori dari profil pengguna
     const fetchTargetCalories = async () => {
       const userDocRef = doc(db, "users", currentUser.uid);
       const docSnap = await getDoc(userDocRef);
       if (docSnap.exists()) {
-        setTargetCalories(docSnap.data().targetCalories || 0);
+        setTargetCalories(docSnap.data().dailyCalories || 0);
       }
     };
 
-    // Ambil data menu dari koleksi lunchBoostMenu
-    const fetchMenuData = onSnapshot(
-      query(collection(db, "lunchBoostMenu"), orderBy("name")),
+    // Ambil data menu dari koleksi lunchBoostMen
+    const unsubMenu = onSnapshot(
+      query(collection(db, "lunchBoostMen"), orderBy("name")),
       (snapshot) => {
         const menu = snapshot.docs.map((d) => ({
           id: d.id,
           ...d.data(),
         }));
         setMenuData(menu);
+        setLoading(false);
       }
     );
 
@@ -69,7 +76,6 @@ function CalorieTracker() {
         setTotalCarbs(0);
         setTotalFats(0);
       }
-      setLoading(false);
     });
 
     // Ambil daftar makanan yang sudah dicatat
@@ -86,9 +92,9 @@ function CalorieTracker() {
     return () => {
       unsubDailyLogs();
       unsubMeals();
-      fetchMenuData();
+      unsubMenu();
     };
-  }, [currentUser, logDocRef, mealsCollectionRef]);
+  }, [currentUser, today]);
 
   const addMeal = async (e) => {
     e.preventDefault();
@@ -100,7 +106,7 @@ function CalorieTracker() {
     try {
       // Menambahkan total kalori dan makro ke dokumen dailyLogs
       await setDoc(
-        logDocRef,
+        doc(db, "users", currentUser.uid, "dailyLogs", today),
         {
           totalCalories: totalCalories + meal.calories,
           totalProtein: totalProtein + (meal.protein || 0),
@@ -111,14 +117,20 @@ function CalorieTracker() {
       );
 
       // Menambahkan makanan ke sub-koleksi 'meals'
-      await addDoc(mealsCollectionRef, {
-        name: meal.name,
-        calories: meal.calories,
-        protein: meal.protein || 0,
-        carbs: meal.carbs || 0,
-        fats: meal.fats || 0,
-        timestamp: serverTimestamp(),
-      });
+      await addDoc(
+        collection(
+          doc(db, "users", currentUser.uid, "dailyLogs", today),
+          "meals"
+        ),
+        {
+          name: meal.name,
+          calories: meal.calories,
+          protein: meal.protein || 0,
+          carbs: meal.carbs || 0,
+          fats: meal.fats || 0,
+          timestamp: serverTimestamp(),
+        }
+      );
 
       setSelectedMeal("");
     } catch (error) {
@@ -141,7 +153,6 @@ function CalorieTracker() {
     <div className="p-6">
       <h2 className="text-3xl font-bold mb-6">Kalori Tracker</h2>
 
-      {/* Ringkasan Kalori & Makro */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-lg p-6 shadow-md flex flex-col items-center justify-center text-center">
           <p className="text-gray-500 font-medium">Kalori Terkonsumsi</p>
@@ -156,7 +167,13 @@ function CalorieTracker() {
           </p>
         </div>
         <div className="bg-white rounded-lg p-6 shadow-md flex flex-col items-center justify-center text-center">
-          <p className="text-gray-500 font-medium">Sisa Kalori</p>
+          <p
+            className={`text-gray-500 font-medium ${
+              remainingCalories >= 0 ? "" : "text-red-500"
+            }`}
+          >
+            Sisa Kalori
+          </p>
           <p
             className={`text-4xl font-bold mt-2 ${
               remainingCalories >= 0 ? "text-green-500" : "text-red-500"
@@ -167,7 +184,6 @@ function CalorieTracker() {
         </div>
       </div>
 
-      {/* Form Tambah Makanan */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <h3 className="text-xl font-semibold mb-4">Catat Makanan Hari Ini</h3>
         <form onSubmit={addMeal} className="flex flex-col sm:flex-row gap-4">
@@ -195,7 +211,6 @@ function CalorieTracker() {
         </form>
       </div>
 
-      {/* Riwayat Makanan Hari Ini */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-xl font-semibold mb-4">
           Riwayat Makanan ({today})
@@ -212,12 +227,10 @@ function CalorieTracker() {
                   <p className="text-sm text-gray-500">{meal.calories} kcal</p>
                 </div>
                 <div className="text-xs text-gray-400">
-                  {meal.timestamp
-                    ?.toDate()
-                    .toLocaleTimeString("id-ID", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                  {meal.timestamp?.toDate().toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </div>
               </li>
             ))}

@@ -1,34 +1,54 @@
 // src/pages/dashboard/OrderHistory.jsx
+import { useState, useEffect } from "react";
 import { Package, Calendar, DollarSign, CheckCircle } from "lucide-react";
-
-const orderHistoryData = [
-  {
-    id: "ORD-928374",
-    date: "28 November 2024",
-    total: 75000,
-    status: "delivered",
-    items: [
-      { name: "Salad Ayam Panggang", qty: 1, price: 45000 },
-      { name: "Smoothie Protein", qty: 1, price: 30000 },
-    ],
-  },
-  {
-    id: "ORD-123985",
-    date: "25 November 2024",
-    total: 50000,
-    status: "processing",
-    items: [{ name: "Salmon Panggang Keto", qty: 1, price: 50000 }],
-  },
-  {
-    id: "ORD-893021",
-    date: "20 November 2024",
-    total: 100000,
-    status: "cancelled",
-    items: [{ name: "Tahu & Tempe Rica-rica", qty: 2, price: 50000 }],
-  },
-];
+import { useAuth } from "../../context/AuthContext";
+import { db } from "../../firebase";
+import {
+  collection,
+  query,
+  onSnapshot,
+  where,
+  orderBy,
+} from "firebase/firestore";
+import { format } from "date-fns";
+import { id } from "date-fns/locale";
 
 function OrderHistory() {
+  const { currentUser } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    const q = query(
+      collection(db, "orders"),
+      where("userId", "==", currentUser.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const ordersData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setOrders(ordersData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching order history:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
   const getStatusColor = (status) => {
     switch (status) {
       case "delivered":
@@ -41,6 +61,14 @@ function OrderHistory() {
         return "bg-gray-100 text-gray-700";
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <p className="text-xl text-gray-500">Memuat riwayat pesanan...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8">
@@ -56,8 +84,8 @@ function OrderHistory() {
 
       {/* Daftar Pesanan */}
       <section className="space-y-6">
-        {orderHistoryData.length > 0 ? (
-          orderHistoryData.map((order) => (
+        {orders.length > 0 ? (
+          orders.map((order) => (
             <div
               key={order.id}
               className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-200"
@@ -67,11 +95,17 @@ function OrderHistory() {
                   <Package className="h-8 w-8 text-[#B23501]" />
                   <div>
                     <h3 className="text-xl font-bold text-gray-800">
-                      Pesanan #{order.id}
+                      Pesanan #{order.id.substring(0, 8)}
                     </h3>
                     <p className="text-sm text-gray-500 flex items-center mt-1">
                       <Calendar className="h-4 w-4 mr-1" />
-                      {order.date}
+                      {order.createdAt
+                        ? format(
+                            order.createdAt.toDate(),
+                            "d MMMM yyyy, HH:mm",
+                            { locale: id }
+                          )
+                        : "Tanggal tidak diketahui"}
                     </p>
                   </div>
                 </div>
@@ -91,7 +125,7 @@ function OrderHistory() {
                     className="flex justify-between text-gray-600"
                   >
                     <span>
-                      {item.qty} x {item.name}
+                      {item.quantity} x {item.name}
                     </span>
                     <span>Rp{item.price.toLocaleString("id-ID")}</span>
                   </div>

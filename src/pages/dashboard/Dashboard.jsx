@@ -11,39 +11,66 @@ import {
   Clock,
   User,
 } from "lucide-react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, collection, query } from "firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
+import { format } from "date-fns";
 
 function Dashboard() {
   const { currentUser } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [totalCalories, setTotalCalories] = useState(0);
+  const [recommendedMenu, setRecommendedMenu] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
 
-    const docRef = doc(db, "users", currentUser.uid);
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setProfile(data);
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    const profileDocRef = doc(db, "users", currentUser.uid);
+    const dailyLogDocRef = doc(
+      db,
+      "users",
+      currentUser.uid,
+      "dailyLogs",
+      today
+    );
+    const menuCollectionRef = collection(db, "lunchBoostMen");
+
+    const unsubProfile = onSnapshot(profileDocRef, (docSnap) => {
+      setProfile(docSnap.exists() ? docSnap.data() : null);
+    });
+
+    const unsubDailyLog = onSnapshot(dailyLogDocRef, (docSnap) => {
+      setTotalCalories(
+        docSnap.exists() ? docSnap.data().totalCalories || 0 : 0
+      );
+    });
+
+    const unsubMenu = onSnapshot(menuCollectionRef, (snapshot) => {
+      if (!snapshot.empty) {
+        const menu = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        const randomIndex = Math.floor(Math.random() * menu.length);
+        setRecommendedMenu(menu[randomIndex]);
       } else {
-        // Jika dokumen tidak ada, set profil ke null
-        setProfile(null);
+        setRecommendedMenu(null);
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubProfile();
+      unsubDailyLog();
+      unsubMenu();
+    };
   }, [currentUser]);
-
-  // Data dummy (sementara)
-  const caloriesConsumed = 950;
-  const recommendedMenu = {
-    name: "Salad Ayam Panggang",
-    calories: 250,
-  };
 
   if (loading) {
     return (
@@ -53,7 +80,6 @@ function Dashboard() {
     );
   }
 
-  // Tampilan jika data profil tidak ada
   if (!profile) {
     return (
       <div className="p-6 md:p-8 text-center bg-white rounded-xl shadow-lg">
@@ -73,8 +99,8 @@ function Dashboard() {
     );
   }
 
-  const dailyCalories = parseInt(profile.dailyCalories) || 2000;
-  const caloriesRemaining = dailyCalories - caloriesConsumed;
+  const targetCalories = parseInt(profile.dailyCalories) || 2000;
+  const caloriesRemaining = targetCalories - totalCalories;
 
   const quickAccessItems = [
     {
@@ -128,7 +154,7 @@ function Dashboard() {
               Kalori Dikonsumsi
             </p>
             <h2 className="text-4xl font-bold text-[#34B26A] mt-1">
-              {caloriesConsumed}{" "}
+              {totalCalories}{" "}
               <span className="text-lg font-normal text-gray-400">kcal</span>
             </h2>
           </div>
@@ -139,7 +165,7 @@ function Dashboard() {
           <div>
             <p className="text-gray-500 text-sm font-semibold">Target Kalori</p>
             <h2 className="text-4xl font-bold text-[#B23501] mt-1">
-              {dailyCalories}{" "}
+              {targetCalories}{" "}
               <span className="text-lg font-normal text-gray-400">kcal</span>
             </h2>
           </div>
@@ -164,9 +190,30 @@ function Dashboard() {
             Rekomendasi Menu Hari Ini
           </h2>
           <div className="flex flex-col space-y-4">
-            <div className="text-center py-10 text-gray-500">
-              Rekomendasi menu akan muncul di sini.
-            </div>
+            {recommendedMenu ? (
+              <div className="flex items-center space-x-4 p-4 rounded-lg bg-gray-50 border border-gray-200">
+                <img
+                  src={recommendedMenu.image_url}
+                  alt={recommendedMenu.name}
+                  className="w-16 h-16 rounded-lg object-cover"
+                />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-800">
+                    {recommendedMenu.name}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {recommendedMenu.description || "Menu lezat dan sehat."}
+                  </p>
+                </div>
+                <span className="text-sm font-bold text-[#34B26A]">
+                  {recommendedMenu.calories} kcal
+                </span>
+              </div>
+            ) : (
+              <div className="text-center py-10 text-gray-500">
+                Tidak ada rekomendasi menu.
+              </div>
+            )}
           </div>
         </div>
       </section>

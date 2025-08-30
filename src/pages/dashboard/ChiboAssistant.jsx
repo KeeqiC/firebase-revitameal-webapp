@@ -1,13 +1,14 @@
 // src/pages/dashboard/ChiboAssistant.jsx
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot } from "lucide-react";
+import chiboLogo from "../../assets/Chibo.png";
 
 function ChiboAssistant() {
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: "chibo",
-      text: "Halo! Saya Chibo, asisten nutrisi Anda. Ada yang bisa saya bantu?",
+      text: "Halo! Saya Chibo, asisten nutrisi pribadi Anda. Ada yang bisa saya bantu?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -17,13 +18,11 @@ function ChiboAssistant() {
     e.preventDefault();
     if (input.trim() === "") return;
 
-    // Tambahkan pesan pengguna
     setMessages((prev) => [
       ...prev,
       { id: Date.now(), sender: "user", text: input },
     ]);
 
-    // Simulasi respons dari asisten AI
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
@@ -33,7 +32,7 @@ function ChiboAssistant() {
           text: "Saat ini saya masih dalam tahap pengembangan. Namun, saya akan segera bisa membantu Anda dengan pertanyaan seputar nutrisi!",
         },
       ]);
-    }, 1000); // Penundaan 1 detik
+    }, 1000);
 
     setInput("");
   };
@@ -50,9 +49,17 @@ function ChiboAssistant() {
     <div className="p-6 md:p-8 flex flex-col h-full">
       {/* Header Halaman */}
       <div className="bg-white p-6 rounded-xl shadow-lg mb-6 sticky top-0 z-10">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-          Chibo Assistant
-        </h1>
+        <div className="flex items-center space-x-3 mb-2">
+          {/* Menggunakan gambar logo Chibo */}
+          <img
+            src={chiboLogo}
+            alt="Chibo Logo"
+            className="h-10 w-10 object-contain"
+          />
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
+            Tanya Chibo
+          </h1>
+        </div>
         <p className="text-gray-600">
           Asisten nutrisi pribadi Anda siap membantu.
         </p>

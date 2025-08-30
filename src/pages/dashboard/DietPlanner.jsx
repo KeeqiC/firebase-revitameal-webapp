@@ -19,78 +19,26 @@ import {
   query,
   onSnapshot,
   getDoc,
-  addDoc,
 } from "firebase/firestore";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 
-// Contoh data makanan (ganti dengan data Anda yang sebenarnya)
-const menuData = [
-  {
-    name: "Salad Ayam Panggang",
-    calories: 250,
-    goal: "Weight Loss",
-    time: "Breakfast",
-  },
-  {
-    name: "Oatmeal Buah",
-    calories: 300,
-    goal: "Weight Gain",
-    time: "Breakfast",
-  },
-  {
-    name: "Nasi Merah Salmon",
-    calories: 450,
-    goal: "Weight Loss",
-    time: "Lunch",
-  },
-  {
-    name: "Spaghetti Bolognese",
-    calories: 600,
-    goal: "Weight Gain",
-    time: "Lunch",
-  },
-  {
-    name: "Dada Ayam Panggang",
-    calories: 350,
-    goal: "Weight Loss",
-    time: "Dinner",
-  },
-  {
-    name: "Steak Daging Sapi",
-    calories: 700,
-    goal: "Weight Gain",
-    time: "Dinner",
-  },
-  { name: "Telur Rebus", calories: 80, goal: "Weight Loss", time: "Snack" },
-  {
-    name: "Smoothie Protein",
-    calories: 250,
-    goal: "Weight Gain",
-    time: "Snack",
-  },
-];
-
 function DietPlanner() {
   const { currentUser } = useAuth();
-  const [dietGoal, setDietGoal] = useState("Unset");
+  const [dietGoal, setDietGoal] = useState("Menurunkan Berat Badan");
+  const [dietPlan, setDietPlan] = useState(null);
+  const [menuData, setMenuData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dietPlan, setDietPlan] = useState({
-    breakfast: null,
-    lunch: null,
-    dinner: null,
-    snack: null,
-  });
-  const [selectedMeal, setSelectedMeal] = useState({
-    name: "",
-    time: "",
-  });
 
   const today = format(new Date(), "yyyy-MM-dd", { locale: id });
-  const planDocRef = doc(db, "users", currentUser.uid, "dietPlans", today);
-  const mealsCollectionRef = collection(planDocRef, "meals");
 
   useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    // Ambil tujuan diet dari profil pengguna
     const fetchDietGoal = async () => {
       const userDocRef = doc(db, "users", currentUser.uid);
       const docSnap = await getDoc(userDocRef);
@@ -100,39 +48,51 @@ function DietPlanner() {
     };
     fetchDietGoal();
 
-    const unsub = onSnapshot(mealsCollectionRef, (snapshot) => {
-      const meals = {};
-      snapshot.forEach((doc) => {
-        const mealData = doc.data();
-        meals[mealData.time.toLowerCase()] = { id: doc.id, ...mealData };
-      });
-      setDietPlan(meals);
+    // Ambil data menu dari koleksi lunchBoostMen
+    const unsubMenu = onSnapshot(
+      collection(db, "lunchBoostMen"),
+      (snapshot) => {
+        const menu = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setMenuData(menu);
+      }
+    );
+
+    // Ambil rencana diet harian
+    const planDocRef = doc(db, "users", currentUser.uid, "dietPlans", today);
+    const unsubPlan = onSnapshot(planDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setDietPlan(docSnap.data());
+      } else {
+        setDietPlan(null);
+      }
       setLoading(false);
     });
 
-    return () => unsub();
-  }, [currentUser, mealsCollectionRef]);
+    return () => {
+      unsubMenu();
+      unsubPlan();
+    };
+  }, [currentUser]);
 
-  const addMealToPlan = async (e) => {
-    e.preventDefault();
-    if (!selectedMeal.name || !selectedMeal.time) return;
-
-    const meal = menuData.find((m) => m.name === selectedMeal.name);
-    if (!meal) return;
-
-    try {
-      // Menambahkan makanan ke sub-koleksi
-      await addDoc(mealsCollectionRef, {
-        name: meal.name,
-        calories: meal.calories,
-        time: selectedMeal.time,
-      });
-
-      setSelectedMeal({ name: "", time: "" });
-    } catch (error) {
-      console.error("Error adding meal to plan:", error);
-      alert("Gagal menambahkan makanan ke rencana diet.");
+  const generateAndSavePlan = async () => {
+    if (menuData.length === 0) {
+      alert("Tidak ada menu yang tersedia untuk membuat rencana.");
+      return;
     }
+
+    const plan = {
+      breakfast: menuData.find((m) => m.type === "menu-andalan"),
+      lunch: menuData.find((m) => m.type === "menu-andalan"),
+      dinner: menuData.find((m) => m.type === "sayuran-sehat"),
+    };
+
+    // Simpan rencana ke Firestore
+    const planDocRef = doc(db, "users", currentUser.uid, "dietPlans", today);
+    await setDoc(planDocRef, plan, { merge: true });
+    alert("Rencana diet berhasil dibuat!");
   };
 
   if (loading) {
@@ -145,11 +105,11 @@ function DietPlanner() {
 
   const getMealIcon = (time) => {
     switch (time) {
-      case "Breakfast":
+      case "breakfast":
         return <Sunrise className="h-6 w-6 text-orange-500" />;
-      case "Lunch":
+      case "lunch":
         return <Sun className="h-6 w-6 text-yellow-500" />;
-      case "Dinner":
+      case "dinner":
         return <Sunset className="h-6 w-6 text-purple-500" />;
       default:
         return <Clock className="h-6 w-6 text-gray-500" />;
@@ -174,69 +134,19 @@ function DietPlanner() {
             Tujuan Diet Anda: {dietGoal}
           </h2>
         </div>
-        <form onSubmit={addMealToPlan} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="mealTime"
-                className="block text-sm font-semibold text-gray-700 mb-1"
-              >
-                Waktu Makan
-              </label>
-              <select
-                id="mealTime"
-                value={selectedMeal.time}
-                onChange={(e) =>
-                  setSelectedMeal({ ...selectedMeal, time: e.target.value })
-                }
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-                required
-              >
-                <option value="" disabled>
-                  Pilih Waktu
-                </option>
-                {["Breakfast", "Lunch", "Dinner", "Snack"].map((time) => (
-                  <option key={time} value={time}>
-                    {time}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor="mealName"
-                className="block text-sm font-semibold text-gray-700 mb-1"
-              >
-                Pilih Makanan
-              </label>
-              <select
-                id="mealName"
-                value={selectedMeal.name}
-                onChange={(e) =>
-                  setSelectedMeal({ ...selectedMeal, name: e.target.value })
-                }
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-                required
-              >
-                <option value="" disabled>
-                  Pilih Makanan
-                </option>
-                {menuData.map((meal) => (
-                  <option key={meal.name} value={meal.name}>
-                    {meal.name} - {meal.calories} kcal
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Klik tombol di bawah ini untuk membuat rencana makan harian
+            berdasarkan tujuan diet Anda.
+          </p>
           <button
-            type="submit"
+            onClick={generateAndSavePlan}
             className="w-full bg-[#B23501] text-white py-2.5 rounded-lg font-semibold hover:bg-[#F9A03F] transition-colors duration-200 flex items-center justify-center space-x-2"
           >
-            <Plus className="h-5 w-5" />
-            <span>Tambah ke Rencana</span>
+            <ClipboardList className="h-5 w-5" />
+            <span>Buat Rencana Harian</span>
           </button>
-        </form>
+        </div>
       </section>
 
       {/* Rencana Diet Harian */}
@@ -245,21 +155,20 @@ function DietPlanner() {
           Rencana Diet Harian ({today})
         </h2>
         <div className="space-y-4">
-          {Object.keys(dietPlan).length > 0 ? (
-            Object.entries(dietPlan).map(([time, meal]) => (
+          {dietPlan ? (
+            Object.entries(dietPlan).map(([mealKey, meal]) => (
               <div
-                key={time}
+                key={mealKey}
                 className="flex items-start space-x-4 p-4 rounded-lg bg-gray-50 border border-gray-200"
               >
-                <div className="flex-shrink-0">{getMealIcon(meal?.time)}</div>
+                <div className="flex-shrink-0">{getMealIcon(mealKey)}</div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-500 font-semibold">
-                    {meal?.time}
+                  <p className="text-sm text-gray-500 font-semibold capitalize">
+                    {mealKey}
                   </p>
-                  <h3 className="font-semibold text-gray-800">{meal?.name}</h3>
-                  <p className="text-sm text-gray-500">{meal?.calories} kcal</p>
+                  <h3 className="font-semibold text-gray-800">{meal.name}</h3>
+                  <p className="text-sm text-gray-500">{meal.calories} kcal</p>
                 </div>
-                <ClipboardList className="h-6 w-6 text-[#B23501] flex-shrink-0" />
               </div>
             ))
           ) : (

@@ -3,9 +3,18 @@ import { useState, useEffect } from "react";
 import { ShoppingCart, X, Heart } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
-import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
+import {
+  collection,
+  query,
+  onSnapshot,
+  orderBy,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { format } from "date-fns";
 
 function LunchBoost() {
+  const { currentUser } = useAuth();
   const [menuData, setMenuData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState("all");
@@ -13,11 +22,10 @@ function LunchBoost() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "lunchBoostMen")); // Menghapus orderBy("name")
+    const q = query(collection(db, "lunchBoostMen"), orderBy("name"));
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        console.log("snapshot docs:", snapshot.docs.length);
         const menu = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -34,7 +42,6 @@ function LunchBoost() {
     return () => unsubscribe();
   }, []);
 
-  // Kode ini dipindahkan ke sini agar bisa diakses di JSX
   const filteredMenu = menuData.filter((menu) =>
     selectedType === "all" ? true : menu.type === selectedType
   );
@@ -47,7 +54,7 @@ function LunchBoost() {
           item.id === menu.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       } else {
-        return [...prevItems, { ...menu, quantity: 1, customization: "" }];
+        return [...prevItems, { ...menu, quantity: 1 }];
       }
     });
   };
@@ -66,21 +73,39 @@ function LunchBoost() {
     );
   };
 
-  const handleCheckout = () => {
-    const total = cartItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) return;
+
+    const orderDetails = {
+      items: cartItems.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      total: cartItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      ),
+      status: "processing",
+      createdAt: serverTimestamp(),
+      userId: currentUser.uid,
+    };
+
+    try {
+      // Simpan pesanan ke Firestore
+      await addDoc(collection(db, "orders"), orderDetails);
+    } catch (error) {
+      console.error("Error saving order:", error);
+      alert("Gagal menyimpan pesanan. Silakan coba lagi.");
+      return;
+    }
+
+    // Buat pesan WhatsApp
     let message = "Halo Revitameal, saya ingin memesan:\n\n";
-
-    cartItems.forEach((item, index) => {
-      message += `${index + 1}. ${item.name}\n`;
-      message += `   Jumlah: ${item.quantity} x Rp${item.price.toLocaleString(
-        "id-ID"
-      )}\n`;
+    orderDetails.items.forEach((item, index) => {
+      message += `${index + 1}. ${item.name} (${item.quantity}x)\n`;
     });
-
-    message += `\nTotal: Rp${total.toLocaleString("id-ID")}\n\n`;
+    message += `\nTotal: Rp${orderDetails.total.toLocaleString("id-ID")}\n\n`;
     message += "Mohon konfirmasi pesanan saya. Terima kasih!";
 
     const whatsappUrl = `https://wa.me/62895123223141?text=${encodeURIComponent(
