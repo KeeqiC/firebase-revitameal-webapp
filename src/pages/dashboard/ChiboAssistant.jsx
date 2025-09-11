@@ -1,9 +1,7 @@
-// src/pages/dashboard/ChiboAssistant.jsx
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot } from "lucide-react";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { getApp } from "firebase/app";
-import chiboLogo from "../../assets/Chibo.png";
+
+const CHIBO_API_URL = "https://revitameal-chibo-api.vercel.app/api/chibo";
 
 function ChiboAssistant() {
   const [messages, setMessages] = useState([
@@ -16,9 +14,6 @@ function ChiboAssistant() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
-
-  const functions = getFunctions(getApp());
-  const chiboAssistant = httpsCallable(functions, "chiboAssistant");
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -33,15 +28,26 @@ function ChiboAssistant() {
     setLoading(true);
 
     try {
-      const result = await chiboAssistant({ message: userMessage });
-      const botReply = result.data.response;
+      const response = await fetch(CHIBO_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: userMessage }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get response from Chibo.");
+      }
+
+      const data = await response.json();
 
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
           sender: "chibo",
-          text: botReply,
+          text: data.response,
         },
       ]);
     } catch (error) {
@@ -69,14 +75,9 @@ function ChiboAssistant() {
 
   return (
     <div className="p-6 md:p-8 flex flex-col h-full">
-      {/* Header Halaman */}
       <div className="bg-white p-6 rounded-xl shadow-lg mb-6 sticky top-0 z-10">
         <div className="flex items-center space-x-3 mb-2">
-          <img
-            src={chiboLogo}
-            alt="Chibo Logo"
-            className="h-10 w-10 object-contain"
-          />
+          <Bot className="h-8 w-8 text-[#B23501]" />
           <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
             Tanya Chibo
           </h1>
@@ -86,7 +87,6 @@ function ChiboAssistant() {
         </p>
       </div>
 
-      {/* Jendela Percakapan */}
       <div className="flex-1 overflow-y-auto p-4 bg-white rounded-xl shadow-lg mb-6">
         <div className="flex flex-col space-y-4">
           {messages.map((msg) => (
@@ -112,18 +112,20 @@ function ChiboAssistant() {
               </div>
             </div>
           ))}
+
+          {/* Loading bubble */}
           {loading && (
-            <div className="flex justify-start">
-              <div className="p-3 bg-gray-200 text-gray-800 rounded-lg rounded-bl-none">
-                Sedang mengetik...
+            <div className="flex items-start justify-start">
+              <div className="bg-gray-200 text-gray-800 p-3 rounded-lg rounded-bl-none max-w-sm">
+                <p>Chibo sedang mengetik...</p>
               </div>
             </div>
           )}
+
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Formulir Input Pesan */}
       <div className="bg-white p-4 rounded-xl shadow-lg mt-auto">
         <form onSubmit={handleSendMessage} className="flex space-x-2">
           <input
@@ -136,7 +138,6 @@ function ChiboAssistant() {
           <button
             type="submit"
             className="p-3 bg-[#B23501] text-white rounded-lg hover:bg-[#F9A03F] transition-colors duration-200"
-            disabled={loading}
           >
             <Send className="h-6 w-6" />
           </button>
