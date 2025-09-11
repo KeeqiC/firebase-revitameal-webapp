@@ -1,6 +1,8 @@
 // src/pages/dashboard/ChiboAssistant.jsx
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot } from "lucide-react";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { getApp } from "firebase/app";
 import chiboLogo from "../../assets/Chibo.png";
 
 function ChiboAssistant() {
@@ -12,29 +14,49 @@ function ChiboAssistant() {
     },
   ]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const handleSendMessage = (e) => {
+  const functions = getFunctions(getApp());
+  const chiboAssistant = httpsCallable(functions, "chiboAssistant");
+
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (input.trim() === "") return;
 
+    const userMessage = input;
     setMessages((prev) => [
       ...prev,
-      { id: Date.now(), sender: "user", text: input },
+      { id: Date.now(), sender: "user", text: userMessage },
     ]);
+    setInput("");
+    setLoading(true);
 
-    setTimeout(() => {
+    try {
+      const result = await chiboAssistant({ message: userMessage });
+      const botReply = result.data.response;
+
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
           sender: "chibo",
-          text: "Saat ini saya masih dalam tahap pengembangan. Namun, saya akan segera bisa membantu Anda dengan pertanyaan seputar nutrisi!",
+          text: botReply,
         },
       ]);
-    }, 1000);
-
-    setInput("");
+    } catch (error) {
+      console.error("Error communicating with Chibo:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          sender: "chibo",
+          text: "Maaf, terjadi kesalahan. Silakan coba lagi.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const scrollToBottom = () => {
@@ -50,7 +72,6 @@ function ChiboAssistant() {
       {/* Header Halaman */}
       <div className="bg-white p-6 rounded-xl shadow-lg mb-6 sticky top-0 z-10">
         <div className="flex items-center space-x-3 mb-2">
-          {/* Menggunakan gambar logo Chibo */}
           <img
             src={chiboLogo}
             alt="Chibo Logo"
@@ -91,6 +112,13 @@ function ChiboAssistant() {
               </div>
             </div>
           ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="p-3 bg-gray-200 text-gray-800 rounded-lg rounded-bl-none">
+                Sedang mengetik...
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -108,6 +136,7 @@ function ChiboAssistant() {
           <button
             type="submit"
             className="p-3 bg-[#B23501] text-white rounded-lg hover:bg-[#F9A03F] transition-colors duration-200"
+            disabled={loading}
           >
             <Send className="h-6 w-6" />
           </button>

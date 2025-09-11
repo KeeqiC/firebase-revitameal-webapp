@@ -108,7 +108,7 @@ function LunchBoost() {
     message += `\nTotal: Rp${orderDetails.total.toLocaleString("id-ID")}\n\n`;
     message += "Mohon konfirmasi pesanan saya. Terima kasih!";
 
-    const whatsappUrl = `https://wa.me/62895123223141?text=${encodeURIComponent(
+    const whatsappUrl = `https://wa.me/6289510662194?text=${encodeURIComponent(
       message
     )}`;
     window.open(whatsappUrl, "_blank");
