@@ -1,30 +1,42 @@
-// src/pages/dashboard/LunchBoost.jsx
 import { useState, useEffect } from "react";
-import { ShoppingCart, X, Heart } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
-import { db } from "../../firebase";
+import { ShoppingCart, X, CheckCircle, Package } from "lucide-react";
+import { db } from "../../firebase"; // ✅ langsung pakai firebase.js
 import {
   collection,
   query,
   onSnapshot,
-  orderBy,
   addDoc,
   serverTimestamp,
+  where,
+  orderBy,
 } from "firebase/firestore";
-import { format } from "date-fns";
+import { useAuth } from "../../context/AuthContext"; // ✅ kalau kamu pakai context user
 
 function LunchBoost() {
   const { currentUser } = useAuth();
   const [menuData, setMenuData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedType, setSelectedType] = useState("all");
   const [cartItems, setCartItems] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("semua");
+  const [message, setMessage] = useState(null);
+  const [isSuccess, setIsSuccess] = useState(true);
 
+  // 🔹 Ambil menu dari Firestore
   useEffect(() => {
-    const q = query(collection(db, "lunchBoostMen"), orderBy("name"));
+    let menuQuery;
+    if (selectedCategory === "semua") {
+      menuQuery = query(collection(db, "lunchBoostMen"), orderBy("name"));
+    } else {
+      menuQuery = query(
+        collection(db, "lunchBoostMen"),
+        where("type", "==", selectedCategory),
+        orderBy("name")
+      );
+    }
+
     const unsubscribe = onSnapshot(
-      q,
+      menuQuery,
       (snapshot) => {
         const menu = snapshot.docs.map((doc) => ({
           id: doc.id,
@@ -36,16 +48,25 @@ function LunchBoost() {
       (error) => {
         console.error("Error fetching menu:", error);
         setLoading(false);
+        setMessage("Gagal memuat menu.");
+        setIsSuccess(false);
       }
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [selectedCategory]);
 
-  const filteredMenu = menuData.filter((menu) =>
-    selectedType === "all" ? true : menu.type === selectedType
-  );
+  const categoryLabels = {
+    "menu-nasi": "Menu Nasi",
+    "lauk-utama": "Lauk Utama",
+    "sayuran-sehat": "Sayuran Sehat",
+    paket: "Paket Campuran Lengkap",
+    "menu-spesial": "Menu Spesial & Hajatan",
+    tambahan: "Minuman & Tambahan",
+    "snack-box": "Snack Box Sehat",
+  };
 
+  // 🔹 Tambah ke keranjang
   const addToCart = (menu) => {
     setCartItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.id === menu.id);
@@ -59,10 +80,12 @@ function LunchBoost() {
     });
   };
 
+  // 🔹 Hapus item dari keranjang
   const removeFromCart = (menuId) => {
     setCartItems((prevItems) => prevItems.filter((item) => item.id !== menuId));
   };
 
+  // 🔹 Update jumlah
   const updateQuantity = (menuId, newQuantity) => {
     setCartItems((prevItems) =>
       prevItems
@@ -73,8 +96,13 @@ function LunchBoost() {
     );
   };
 
+  // 🔹 Checkout → simpan ke Firestore + panggil Mayar
   const handleCheckout = async () => {
-    if (cartItems.length === 0) return;
+    if (cartItems.length === 0) {
+      setMessage("Keranjang belanja kosong.");
+      setIsSuccess(false);
+      return;
+    }
 
     const orderDetails = {
       items: cartItems.map((item) => ({
@@ -88,30 +116,41 @@ function LunchBoost() {
       ),
       status: "processing",
       createdAt: serverTimestamp(),
-      userId: currentUser.uid,
+      userId: currentUser?.uid || "anon",
     };
 
     try {
-      // Simpan pesanan ke Firestore
-      await addDoc(collection(db, "orders"), orderDetails);
+      // Simpan order ke Firestore
+      const orderRef = await addDoc(collection(db, "orders"), orderDetails);
+
+      // 🔹 Panggil backend buat bikin link pembayaran Mayar
+      const res = await fetch("/api/createPayment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          total: orderDetails.total,
+          orderId: orderRef.id,
+          customer_email: currentUser?.email || "anon@example.com",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data?.payment?.data?.url) {
+        // redirect user ke halaman pembayaran Mayar
+        window.location.href = data.payment.data.url;
+      } else {
+        setMessage("Gagal membuat link pembayaran.");
+        setIsSuccess(false);
+      }
+
+      setCartItems([]);
+      setIsModalOpen(false);
     } catch (error) {
       console.error("Error saving order:", error);
-      alert("Gagal menyimpan pesanan. Silakan coba lagi.");
-      return;
+      setMessage("Gagal menyimpan pesanan. Silakan coba lagi.");
+      setIsSuccess(false);
     }
-
-    // Buat pesan WhatsApp
-    let message = "Halo Revitameal, saya ingin memesan:\n\n";
-    orderDetails.items.forEach((item, index) => {
-      message += `${index + 1}. ${item.name} (${item.quantity}x)\n`;
-    });
-    message += `\nTotal: Rp${orderDetails.total.toLocaleString("id-ID")}\n\n`;
-    message += "Mohon konfirmasi pesanan saya. Terima kasih!";
-
-    const whatsappUrl = `https://wa.me/6289510662194?text=${encodeURIComponent(
-      message
-    )}`;
-    window.open(whatsappUrl, "_blank");
   };
 
   const cartTotal = cartItems.reduce(
@@ -129,7 +168,7 @@ function LunchBoost() {
 
   return (
     <div className="p-6 md:p-8">
-      {/* Header Halaman */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
@@ -148,138 +187,199 @@ function LunchBoost() {
         </button>
       </div>
 
-      {/* Filter Kategori */}
-      <div className="flex flex-wrap gap-3 mb-8">
-        {["all", "menu-andalan", "sayuran-sehat"].map((type) => (
+      {/* Filter kategori */}
+      <div className="flex flex-wrap gap-2 mb-8">
+        <button
+          onClick={() => setSelectedCategory("semua")}
+          className={`px-4 py-2 rounded-full font-semibold transition-colors duration-200 ${
+            selectedCategory === "semua"
+              ? "bg-[#B23501] text-white"
+              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+          }`}
+        >
+          Semua Kategori
+        </button>
+        {Object.keys(categoryLabels).map((category) => (
           <button
-            key={type}
-            onClick={() => setSelectedType(type)}
-            className={`px-4 py-2 rounded-full font-semibold capitalize transition-colors duration-200 ${
-              selectedType === type
-                ? "bg-[#F27F34] text-white"
+            key={category}
+            onClick={() => setSelectedCategory(category)}
+            className={`px-4 py-2 rounded-full font-semibold transition-colors duration-200 ${
+              selectedCategory === category
+                ? "bg-[#B23501] text-white"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
-            {type === "all" ? "Semua Menu" : type.replace("-", " ")}
+            {categoryLabels[category]}
           </button>
         ))}
       </div>
 
-      {/* Daftar Menu */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredMenu.length > 0 ? (
-          filteredMenu.map((menu) => (
-            <div
-              key={menu.id}
-              className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col hover:shadow-xl transition-shadow duration-300"
-            >
-              <div className="relative h-48">
-                <img
-                  src={menu.image_url}
-                  alt={menu.name}
-                  className="w-full h-full object-cover"
-                />
+      {/* List menu */}
+      <section className="mb-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">
+          {selectedCategory === "semua"
+            ? "Semua Menu"
+            : categoryLabels[selectedCategory] || selectedCategory}
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {menuData.length === 0 ? (
+            <p className="text-gray-500">Tidak ada menu di kategori ini.</p>
+          ) : (
+            menuData.map((menu) => (
+              <div
+                key={menu.id}
+                className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col hover:shadow-xl transition-shadow duration-300"
+              >
+                {menu.items ? (
+                  <div className="p-6 flex-1 flex flex-col">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">
+                      {menu.name}
+                    </h3>
+                    <ul className="mb-4 text-gray-600 text-sm space-y-1">
+                      {menu.items?.map((item, index) => (
+                        <li key={index} className="flex items-center space-x-2">
+                          <CheckCircle className="h-4 w-4 text-[#34B26A]" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex justify-between items-center mt-auto">
+                      <span className="font-bold text-lg">
+                        Rp{menu.price.toLocaleString("id-ID")}
+                      </span>
+                      <button
+                        onClick={() => addToCart(menu)}
+                        className="bg-[#B23501] text-white py-2 px-4 rounded-full font-semibold hover:bg-[#F9A03F] transition-colors duration-200"
+                      >
+                        + Pesan
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative h-48">
+                      <img
+                        src={menu.image_url}
+                        alt={menu.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="p-6 flex-1 flex flex-col">
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">
+                        {menu.name}
+                      </h3>
+                      <span className="text-sm font-semibold text-[#34B26A]">
+                        {menu.calories} kcal
+                      </span>
+                      <div className="flex justify-between items-center mt-4">
+                        <span className="font-bold text-lg">
+                          Rp{menu.price.toLocaleString("id-ID")}
+                        </span>
+                        <button
+                          onClick={() => addToCart(menu)}
+                          className="bg-[#B23501] text-white py-2 px-4 rounded-full font-semibold hover:bg-[#F9A03F] transition-colors duration-200"
+                        >
+                          + Pesan
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="p-6 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-bold text-gray-800">
-                    {menu.name}
-                  </h3>
-                  <span className="text-sm font-semibold text-[#34B26A]">
-                    {menu.calories} kcal
-                  </span>
-                </div>
-                <p className="text-gray-500 text-sm mb-4 flex-1">
-                  {menu.description || "Menu lezat dan sehat untuk Anda!"}
-                </p>
-
-                <div className="mt-auto">
-                  <button
-                    onClick={() => addToCart(menu)}
-                    className="w-full bg-[#B23501] text-white py-2 rounded-full font-semibold hover:bg-[#F9A03F] transition-colors duration-200 flex items-center justify-center space-x-2"
-                  >
-                    <ShoppingCart className="h-5 w-5" />
-                    <span>Pesan Sekarang</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="col-span-full text-center py-20 text-gray-500">
-            Tidak ada menu yang sesuai dengan filter Anda.
-          </div>
-        )}
-      </div>
-
+            ))
+          )}
+        </div>
+      </section>
       {/* Modal Keranjang */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b">
               <h2 className="text-2xl font-bold text-gray-800">
                 Keranjang Belanja
               </h2>
               <button
+                className="text-gray-500 hover:text-gray-800 transition"
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
-            {cartItems.length === 0 ? (
-              <p className="text-center text-gray-500">
-                Keranjang Anda kosong.
-              </p>
-            ) : (
-              <>
-                <div className="space-y-4">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-4">
+
+            {/* Isi Keranjang */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {cartItems.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  Keranjang kosong. Yuk pilih menu dulu 🍽️
+                </div>
+              ) : (
+                cartItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between border rounded-lg p-4 hover:shadow-md transition"
+                  >
+                    <div className="flex items-center space-x-4">
                       <img
-                        src={item.image_url}
+                        src={item.image_url || "/placeholder.png"}
                         alt={item.name}
-                        className="w-16 h-16 rounded-lg object-cover"
+                        className="w-16 h-16 rounded-md object-cover"
                       />
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800">
+                      <div>
+                        <p className="font-semibold text-gray-800">
                           {item.name}
-                        </h3>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateQuantity(item.id, parseInt(e.target.value))
-                          }
-                          className="w-16 px-2 py-1 text-center border rounded-lg"
-                        />
-                        <button
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <X className="h-5 w-5" />
-                        </button>
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Rp{item.price.toLocaleString("id-ID")}
+                        </p>
                       </div>
                     </div>
-                  ))}
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() =>
+                          updateQuantity(item.id, item.quantity - 1)
+                        }
+                        className="px-3 py-1 bg-gray-200 rounded-lg hover:bg-gray-300"
+                      >
+                        -
+                      </button>
+                      <span className="px-2">{item.quantity}</span>
+                      <button
+                        onClick={() =>
+                          updateQuantity(item.id, item.quantity + 1)
+                        }
+                        className="px-3 py-1 bg-gray-200 rounded-lg hover:bg-gray-300"
+                      >
+                        +
+                      </button>
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        className="ml-2 text-red-500 hover:text-red-700"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer Total + Checkout */}
+            {cartItems.length > 0 && (
+              <div className="border-t p-6 bg-gray-50 rounded-b-2xl">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="font-semibold text-lg">Total</span>
+                  <span className="font-bold text-2xl text-[#B23501]">
+                    Rp{cartTotal.toLocaleString("id-ID")}
+                  </span>
                 </div>
-                <div className="mt-6 pt-6 border-t">
-                  <h3 className="text-xl font-bold text-gray-800 text-right">
-                    Total: Rp{cartTotal.toLocaleString("id-ID")}
-                  </h3>
-                </div>
-                <div className="mt-6">
-                  <button
-                    onClick={handleCheckout}
-                    className="w-full bg-[#34B26A] text-white py-3 rounded-full font-semibold hover:bg-green-700 transition-colors duration-200"
-                  >
-                    Lanjutkan ke WhatsApp
-                  </button>
-                </div>
-              </>
+                <button
+                  onClick={handleCheckout}
+                  className="w-full bg-[#B23501] text-white py-3 rounded-lg text-lg font-semibold hover:bg-[#F9A03F] transition-colors"
+                >
+                  Checkout Sekarang
+                </button>
+              </div>
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 // src/pages/dashboard/OrderHistory.jsx
 import { useState, useEffect } from "react";
-import { Package, Calendar, DollarSign, CheckCircle } from "lucide-react";
+import { Package, Calendar } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import {
@@ -49,10 +49,13 @@ function OrderHistory() {
     return () => unsubscribe();
   }, [currentUser]);
 
+  // 🔹 warna status
   const getStatusColor = (status) => {
     switch (status) {
       case "delivered":
         return "bg-green-100 text-green-700";
+      case "paid":
+        return "bg-blue-100 text-blue-700"; // sudah dibayar
       case "processing":
         return "bg-yellow-100 text-yellow-700";
       case "cancelled":
@@ -78,7 +81,7 @@ function OrderHistory() {
           Riwayat Pesanan
         </h1>
         <p className="text-gray-600">
-          Lihat semua pesanan `Lunch Boost` Anda sebelumnya.
+          Lihat semua pesanan <b>Lunch Boost</b> Anda sebelumnya.
         </p>
       </div>
 
@@ -90,6 +93,7 @@ function OrderHistory() {
               key={order.id}
               className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-200"
             >
+              {/* Header Pesanan */}
               <div className="flex justify-between items-center mb-4 border-b pb-4">
                 <div className="flex items-center space-x-4">
                   <Package className="h-8 w-8 text-[#B23501]" />
@@ -114,27 +118,35 @@ function OrderHistory() {
                     order.status
                   )}`}
                 >
-                  {order.status}
+                  {order.status || "unknown"}
                 </div>
               </div>
 
+              {/* Item Pesanan */}
               <div className="space-y-3">
-                {order.items.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between text-gray-600"
-                  >
-                    <span>
-                      {item.quantity} x {item.name}
-                    </span>
-                    <span>Rp{item.price.toLocaleString("id-ID")}</span>
-                  </div>
-                ))}
+                {order.items?.length > 0 ? (
+                  order.items.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between text-gray-600"
+                    >
+                      <span>
+                        {item.quantity} x {item.name}
+                      </span>
+                      <span>Rp{item.price.toLocaleString("id-ID")}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400 italic">
+                    Tidak ada item di pesanan ini.
+                  </p>
+                )}
               </div>
 
+              {/* Total */}
               <div className="mt-4 pt-4 border-t flex justify-between items-center font-bold text-lg">
                 <span>Total</span>
-                <span>Rp{order.total.toLocaleString("id-ID")}</span>
+                <span>Rp{order.total?.toLocaleString("id-ID") || 0}</span>
               </div>
             </div>
           ))
