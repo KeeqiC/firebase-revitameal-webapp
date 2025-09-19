@@ -1,38 +1,62 @@
-import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router-dom';
-import RootLayout from './layouts/RootLayout';
+// src/App.jsx
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import MainLayout from "./layouts/MainLayout";
+import DashboardLayout from "./layouts/DashboardLayout";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AdminPage from "./pages/dashboard/AdminPage";
 
-// Halaman-halaman
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import LunchBoost from './pages/LunchBoost';
-import Calories from './pages/Calories';
-import DietPlanner from './pages/DietPlanner';
-import FoodJournal from './pages/FoodJournal';
-import FitnessGuide from './pages/FitnessGuide';
-import Chibo from './pages/Chibo';
+// Menggunakan React.lazy() untuk memuat halaman secara dinamis
+const Home = lazy(() => import("./pages/public/Home"));
+const Login = lazy(() => import("./pages/auth/Login"));
+const Register = lazy(() => import("./pages/auth/Register"));
 
-const router = createBrowserRouter(
-  createRoutesFromElements(
-    <Route path="/" element={<RootLayout />}>
-      <Route index element={<Home />} />
-      <Route path="login" element={<Login />} />
-      <Route path="register" element={<Register />} />
-      <Route path="dashboard" element={<Dashboard />} />
-      <Route path="lunchboost" element={<LunchBoost />} />
-      <Route path="calories" element={<Calories />} />
-      <Route path="diet-planner" element={<DietPlanner />} />
-      <Route path="food-journal" element={<FoodJournal />} />
-      <Route path="fitness-guide" element={<FitnessGuide />} />
-      <Route path="chibo" element={<Chibo />} />
-    </Route>
-  )
-);
+const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
+const LunchBoost = lazy(() => import("./pages/dashboard/LunchBoost"));
+const CalorieTracker = lazy(() => import("./pages/dashboard/CalorieTracker"));
+const DietPlanner = lazy(() => import("./pages/dashboard/DietPlanner"));
+const FoodJournal = lazy(() => import("./pages/dashboard/FoodJournal"));
+const FitnessGuide = lazy(() => import("./pages/dashboard/FitnessGuide"));
+const ChiboAssistant = lazy(() => import("./pages/dashboard/ChiboAssistant"));
+const Profile = lazy(() => import("./pages/dashboard/Profile"));
+const OrderHistory = lazy(() => import("./pages/dashboard/OrderHistory"));
 
 function App() {
   return (
-    <RouterProvider router={router} />
+    <BrowserRouter>
+      <Suspense
+        fallback={
+          <div className="flex justify-center items-center min-h-screen">
+            <p className="text-xl text-gray-500">Memuat...</p>
+          </div>
+        }
+      >
+        <Routes>
+          {/* Rute Publik */}
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Home />} />
+          </Route>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Rute Terproteksi */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<DashboardLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="admin" element={<AdminPage />} />
+              <Route path="lunch-boost" element={<LunchBoost />} />
+              <Route path="calorie-tracker" element={<CalorieTracker />} />
+              <Route path="diet-planner" element={<DietPlanner />} />
+              <Route path="food-journal" element={<FoodJournal />} />
+              <Route path="fitness-guide" element={<FitnessGuide />} />
+              <Route path="chibo" element={<ChiboAssistant />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="order-history" element={<OrderHistory />} />
+            </Route>
+          </Route>
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   );
 }
 
