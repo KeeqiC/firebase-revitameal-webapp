@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { ShoppingCart, X, CheckCircle, Package } from "lucide-react";
-import { db } from "../../firebase"; // ✅ langsung pakai firebase.js
+import { ShoppingCart, X, CheckCircle } from "lucide-react";
+import { db } from "../../firebase";
 import {
   collection,
   query,
@@ -10,7 +10,7 @@ import {
   where,
   orderBy,
 } from "firebase/firestore";
-import { useAuth } from "../../context/AuthContext"; // ✅ kalau kamu pakai context user
+import { useAuth } from "../../context/AuthContext";
 
 function LunchBoost() {
   const { currentUser } = useAuth();
@@ -22,7 +22,28 @@ function LunchBoost() {
   const [message, setMessage] = useState(null);
   const [isSuccess, setIsSuccess] = useState(true);
 
-  // 🔹 Ambil menu dari Firestore
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const q = query(
+      collection(db, "orders"),
+      where("userId", "==", currentUser.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.status === "paid") {
+          setMessage("Pembayaran berhasil 🎉");
+          setIsSuccess(true);
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
   useEffect(() => {
     let menuQuery;
     if (selectedCategory === "semua") {
@@ -66,7 +87,6 @@ function LunchBoost() {
     "snack-box": "Snack Box Sehat",
   };
 
-  // 🔹 Tambah ke keranjang
   const addToCart = (menu) => {
     setCartItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.id === menu.id);
@@ -80,12 +100,10 @@ function LunchBoost() {
     });
   };
 
-  // 🔹 Hapus item dari keranjang
   const removeFromCart = (menuId) => {
     setCartItems((prevItems) => prevItems.filter((item) => item.id !== menuId));
   };
 
-  // 🔹 Update jumlah
   const updateQuantity = (menuId, newQuantity) => {
     setCartItems((prevItems) =>
       prevItems
@@ -96,7 +114,6 @@ function LunchBoost() {
     );
   };
 
-  // 🔹 Checkout → simpan ke Firestore + panggil Mayar
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
       setMessage("Keranjang belanja kosong.");
@@ -114,41 +131,53 @@ function LunchBoost() {
         (sum, item) => sum + item.price * item.quantity,
         0
       ),
-      status: "processing",
+      status: "pending",
       createdAt: serverTimestamp(),
       userId: currentUser?.uid || "anon",
     };
 
     try {
-      // Simpan order ke Firestore
       const orderRef = await addDoc(collection(db, "orders"), orderDetails);
 
-      // 🔹 Panggil backend buat bikin link pembayaran Mayar
-      const res = await fetch("/api/createPayment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          total: orderDetails.total,
-          orderId: orderRef.id,
-          customer_email: currentUser?.email || "anon@example.com",
-        }),
-      });
+      const response = await fetch(
+        // ✅ Perubahan: Menggunakan URL untuk mode Sandbox
+        `https://api.mayar.club/hl/v1/payment/create`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: orderDetails.total,
+            description: `Order #${orderRef.id}`,
+            orderId: orderRef.id,
+            // ✅ Perbaikan: Menggunakan nama variabel yang sesuai dengan dokumentasi Mayar
+            name: currentUser?.displayName || "Anonymous User",
+            email: currentUser?.email || "user@email.com",
+            mobile: "08123456789",
+          }),
+        }
+      );
 
-      const data = await res.json();
-
-      if (data?.payment?.data?.url) {
-        // redirect user ke halaman pembayaran Mayar
-        window.location.href = data.payment.data.url;
-      } else {
-        setMessage("Gagal membuat link pembayaran.");
-        setIsSuccess(false);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+        );
       }
 
-      setCartItems([]);
-      setIsModalOpen(false);
+      const data = await response.json();
+      const checkoutUrl = data.redirect_url;
+
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        setMessage("Gagal membuat link pembayaran. URL tidak ditemukan.");
+        setIsSuccess(false);
+      }
     } catch (error) {
-      console.error("Error saving order:", error);
-      setMessage("Gagal menyimpan pesanan. Silakan coba lagi.");
+      console.error("Error during checkout:", error);
+      setMessage(
+        `Gagal menyimpan pesanan: ${error.message}. Silakan coba lagi.`
+      );
       setIsSuccess(false);
     }
   };
@@ -168,7 +197,17 @@ function LunchBoost() {
 
   return (
     <div className="p-6 md:p-8">
-      {/* Header */}
+      {message && (
+        <div
+          className={`fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg text-white font-semibold flex items-center space-x-2 transition-transform duration-300 ${
+            isSuccess ? "bg-green-500" : "bg-red-500"
+          }`}
+        >
+          {isSuccess ? <CheckCircle /> : <X />}
+          <span>{message}</span>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
@@ -187,7 +226,6 @@ function LunchBoost() {
         </button>
       </div>
 
-      {/* Filter kategori */}
       <div className="flex flex-wrap gap-2 mb-8">
         <button
           onClick={() => setSelectedCategory("semua")}
@@ -214,7 +252,6 @@ function LunchBoost() {
         ))}
       </div>
 
-      {/* List menu */}
       <section className="mb-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">
           {selectedCategory === "semua"
@@ -290,11 +327,10 @@ function LunchBoost() {
           )}
         </div>
       </section>
-      {/* Modal Keranjang */}
+
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
-            {/* Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b">
               <h2 className="text-2xl font-bold text-gray-800">
                 Keranjang Belanja
@@ -307,7 +343,6 @@ function LunchBoost() {
               </button>
             </div>
 
-            {/* Isi Keranjang */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {cartItems.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">
@@ -364,7 +399,6 @@ function LunchBoost() {
               )}
             </div>
 
-            {/* Footer Total + Checkout */}
             {cartItems.length > 0 && (
               <div className="border-t p-6 bg-gray-50 rounded-b-2xl">
                 <div className="flex justify-between items-center mb-4">

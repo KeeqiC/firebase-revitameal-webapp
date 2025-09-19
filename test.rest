@@ -1,0 +1,9 @@
+POST https://revitameal-chibo-1ov3xfix4-ackermanrafandra-9111s-projects.vercel.app/api/createPayment
+Content-Type: application/json
+
+{
+  "amount": 10000,
+  "description": "Test checkout",
+  "customer_name": "Shikikan",
+  "customer_email": "shikikan@example.com"
+}
