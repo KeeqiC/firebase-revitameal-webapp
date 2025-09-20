@@ -34,89 +34,135 @@ function Checkout() {
     setIsLoading(true);
     setMessage(null);
 
+    const cartTotal = cartItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+
     const orderDetails = {
       items: cartItems.map((item) => ({
         name: item.name,
         quantity: item.quantity,
         price: item.price,
       })),
-      total: cartItems.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      ),
+      total: cartTotal,
       status: "pending",
       createdAt: serverTimestamp(),
       userId: currentUser?.uid || "anon",
     };
 
     try {
+      // Simpan order ke Firebase
       const orderRef = await addDoc(collection(db, "orders"), orderDetails);
       const orderId = orderRef.id;
 
-      const response = await fetch("/api/create-transaction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          // BENAR: Buat objek transaction_details dan gunakan snake_case
-          transaction_details: {
-            order_id: orderId, // order_id ini akan ditimpa oleh backend, tapi tidak apa-apa
+      // Siapkan request body sesuai dengan backend yang sudah berhasil
+      const requestBody = {
+        transaction_details: {
+          gross_amount: cartTotal, // Backend akan generate order_id sendiri
+        },
+        customer_details: {
+          first_name: currentUser?.displayName || "Anonymous User",
+          last_name: "", // Opsional
+          email: currentUser?.email || "user@email.com",
+          phone: "+6281234567890", // Pastikan format dengan +62
+        },
+        item_details: orderDetails.items.map((item, index) => ({
+          id: `item-${index + 1}`, // ID sederhana
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+      };
+
+      console.log("Mengirim request ke backend:", requestBody);
+
+      // Call backend API dengan URL yang benar
+      const response = await fetch(
+        "https://revitameal-api2.vercel.app/api/create-transaction",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-          gross_amount: orderDetails.total,
-          // BENAR: Gunakan snake_case
-          customer_details: {
-            first_name: currentUser?.displayName || "Anonymous User",
-            email: currentUser?.email || "user@email.com",
-            phone: "081234567890",
-          },
-          // BENAR: Gunakan snake_case
-          item_details: orderDetails.items.map((item) => ({
-            id: item.name.replace(/\s+/g, "-").toLowerCase(),
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-          })),
-        }),
-      });
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      console.log("Response status:", response.status);
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Gagal membuat transaksi.");
+        console.error("Backend error:", errorData);
+        throw new Error(
+          errorData.message ||
+            `HTTP ${response.status}: Gagal membuat transaksi`
+        );
       }
 
       const data = await response.json();
-      const snapToken = data.snapToken;
+      console.log("Response dari backend:", data);
 
-      if (window.snap && snapToken) {
-        window.snap.pay(snapToken, {
-          onSuccess: (result) => {
-            console.log("Pembayaran sukses:", result);
-            setMessage("Pembayaran berhasil! 🎉");
-            setIsSuccess(true);
-            setIsLoading(false);
-            // Kosongkan keranjang setelah berhasil & arahkan ke halaman status
-            setCartItems([]);
-            setTimeout(() => navigate("/order-status"), 3000); // Contoh: Arahkan setelah 3 detik
-          },
-          onPending: (result) => {
-            console.log("Pembayaran pending:", result);
-            setMessage("Menunggu pembayaran Anda.");
-            setIsSuccess(true);
-            setIsLoading(false);
-          },
-          onError: (result) => {
-            console.error("Pembayaran gagal:", result);
-            setMessage("Pembayaran gagal. Silakan coba lagi.");
-            setIsSuccess(false);
-            setIsLoading(false);
-          },
-          onClose: () => {
-            console.log("Popup pembayaran ditutup.");
-            setIsLoading(false);
-          },
-        });
-      } else {
-        throw new Error("Snap.js tidak termuat atau token tidak ada.");
+      // Pastikan response memiliki structure yang benar
+      if (!data.success || !data.data?.snapToken) {
+        throw new Error("Invalid response from server: snapToken not found");
       }
+
+      const snapToken = data.data.snapToken;
+      const backendOrderId = data.data.order_id;
+
+      console.log("Snap Token:", snapToken);
+      console.log("Backend Order ID:", backendOrderId);
+
+      // Pastikan window.snap tersedia
+      if (!window.snap) {
+        throw new Error(
+          "Midtrans Snap.js tidak termuat. Pastikan script sudah ditambahkan ke HTML."
+        );
+      }
+
+      // Buka payment popup
+      window.snap.pay(snapToken, {
+        onSuccess: (result) => {
+          console.log("Pembayaran sukses:", result);
+          setMessage("Pembayaran berhasil! 🎉");
+          setIsSuccess(true);
+          setIsLoading(false);
+
+          // Kosongkan keranjang setelah berhasil
+          setCartItems([]);
+
+          // Arahkan ke halaman status setelah 3 detik
+          setTimeout(() => {
+            navigate("/dashboard/order-history");
+          }, 3000);
+        },
+        onPending: (result) => {
+          console.log("Pembayaran pending:", result);
+          setMessage(
+            "Pembayaran sedang diproses. Silakan selesaikan pembayaran Anda."
+          );
+          setIsSuccess(true);
+          setIsLoading(false);
+
+          // Arahkan ke halaman status
+          setTimeout(() => {
+            navigate("/dashboard/order-history"); // Ganti dengan path yang benar
+          }, 2000);
+        },
+        onError: (result) => {
+          console.error("Pembayaran gagal:", result);
+          setMessage("Pembayaran gagal. Silakan coba lagi.");
+          setIsSuccess(false);
+          setIsLoading(false);
+        },
+        onClose: () => {
+          console.log("Popup pembayaran ditutup.");
+          setMessage("Pembayaran dibatalkan.");
+          setIsSuccess(false);
+          setIsLoading(false);
+        },
+      });
     } catch (error) {
       console.error("Error saat pembayaran:", error);
       setMessage(`Gagal memproses pembayaran: ${error.message}`);
@@ -157,9 +203,9 @@ function Checkout() {
         </div>
 
         <div className="space-y-4 mb-8">
-          {cartItems.map((item) => (
+          {cartItems.map((item, index) => (
             <div
-              key={item.id}
+              key={item.id || index}
               className="flex justify-between items-center border-b pb-4"
             >
               <div className="flex items-center space-x-4">

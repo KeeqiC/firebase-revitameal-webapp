@@ -5,6 +5,7 @@ import MainLayout from "./layouts/MainLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminPage from "./pages/dashboard/AdminPage";
+import ScrollManager from "./utils/ScrollManager";
 
 // Menggunakan React.lazy() untuk memuat halaman secara dinamis
 const Home = lazy(() => import("./pages/public/Home"));
@@ -25,6 +26,7 @@ const Checkout = lazy(() => import("./pages/dashboard/Checkout"));
 function App() {
   return (
     <BrowserRouter>
+      <ScrollManager />
       <Suspense
         fallback={
           <div className="flex justify-center items-center min-h-screen">
