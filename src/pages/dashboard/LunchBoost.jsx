@@ -1,18 +1,18 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom"; // Perubahan: Ditambahkan untuk navigasi
 import { ShoppingCart, X, CheckCircle } from "lucide-react";
 import { db } from "../../firebase";
 import {
   collection,
   query,
   onSnapshot,
-  addDoc,
-  serverTimestamp,
   where,
   orderBy,
 } from "firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
 
 function LunchBoost() {
+  const navigate = useNavigate(); // Perubahan: Inisialisasi hook navigasi
   const { currentUser } = useAuth();
   const [menuData, setMenuData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +23,7 @@ function LunchBoost() {
   const [isSuccess, setIsSuccess] = useState(true);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) return; // Notifikasi pembayaran akan ditangani oleh webhook.
 
     const q = query(
       collection(db, "orders"),
@@ -114,73 +114,17 @@ function LunchBoost() {
     );
   };
 
-  const handleCheckout = async () => {
+
+  const handleCheckout = () => {
     if (cartItems.length === 0) {
       setMessage("Keranjang belanja kosong.");
       setIsSuccess(false);
       return;
     }
-
-    const orderDetails = {
-      items: cartItems.map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      total: cartItems.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      ),
-      status: "pending",
-      createdAt: serverTimestamp(),
-      userId: currentUser?.uid || "anon",
-    };
-
-    try {
-      const orderRef = await addDoc(collection(db, "orders"), orderDetails);
-
-      const response = await fetch(
-        // ✅ Perubahan: Menggunakan URL untuk mode Sandbox
-        `https://api.mayar.club/hl/v1/payment/create`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: orderDetails.total,
-            description: `Order #${orderRef.id}`,
-            orderId: orderRef.id,
-            // ✅ Perbaikan: Menggunakan nama variabel yang sesuai dengan dokumentasi Mayar
-            name: currentUser?.displayName || "Anonymous User",
-            email: currentUser?.email || "user@email.com",
-            mobile: "08123456789",
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || `HTTP error! status: ${response.status}`
-        );
-      }
-
-      const data = await response.json();
-      const checkoutUrl = data.redirect_url;
-
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
-      } else {
-        setMessage("Gagal membuat link pembayaran. URL tidak ditemukan.");
-        setIsSuccess(false);
-      }
-    } catch (error) {
-      console.error("Error during checkout:", error);
-      setMessage(
-        `Gagal menyimpan pesanan: ${error.message}. Silakan coba lagi.`
-      );
-      setIsSuccess(false);
-    }
+    // Alihkan ke halaman checkout dan kirim data keranjang
+    navigate('/dashboard/checkout', { state: { items: cartItems } }); 
   };
+
 
   const cartTotal = cartItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -207,7 +151,6 @@ function LunchBoost() {
           <span>{message}</span>
         </div>
       )}
-
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
@@ -225,7 +168,6 @@ function LunchBoost() {
           <span>({cartItems.length})</span>
         </button>
       </div>
-
       <div className="flex flex-wrap gap-2 mb-8">
         <button
           onClick={() => setSelectedCategory("semua")}
@@ -251,7 +193,6 @@ function LunchBoost() {
           </button>
         ))}
       </div>
-
       <section className="mb-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">
           {selectedCategory === "semua"
@@ -342,7 +283,6 @@ function LunchBoost() {
                 <X className="h-6 w-6" />
               </button>
             </div>
-
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {cartItems.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">
@@ -398,7 +338,6 @@ function LunchBoost() {
                 ))
               )}
             </div>
-
             {cartItems.length > 0 && (
               <div className="border-t p-6 bg-gray-50 rounded-b-2xl">
                 <div className="flex justify-between items-center mb-4">
@@ -408,7 +347,7 @@ function LunchBoost() {
                   </span>
                 </div>
                 <button
-                  onClick={handleCheckout}
+                  onClick={handleCheckout} // Memanggil fungsi checkout yang baru
                   className="w-full bg-[#B23501] text-white py-3 rounded-lg text-lg font-semibold hover:bg-[#F9A03F] transition-colors"
                 >
                   Checkout Sekarang

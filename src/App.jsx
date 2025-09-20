@@ -20,6 +20,7 @@ const FitnessGuide = lazy(() => import("./pages/dashboard/FitnessGuide"));
 const ChiboAssistant = lazy(() => import("./pages/dashboard/ChiboAssistant"));
 const Profile = lazy(() => import("./pages/dashboard/Profile"));
 const OrderHistory = lazy(() => import("./pages/dashboard/OrderHistory"));
+const Checkout = lazy(() => import("./pages/dashboard/Checkout"));
 
 function App() {
   return (
@@ -52,6 +53,7 @@ function App() {
               <Route path="chibo" element={<ChiboAssistant />} />
               <Route path="profile" element={<Profile />} />
               <Route path="order-history" element={<OrderHistory />} />
+              <Route path="checkout" element={<Checkout />} />
             </Route>
           </Route>
         </Routes>
