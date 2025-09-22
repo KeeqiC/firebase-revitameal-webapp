@@ -1,6 +1,20 @@
 // src/pages/dashboard/Profile.jsx
 import { useState, useEffect } from "react";
-import { User, Mail, Target, Settings, Save } from "lucide-react";
+import {
+  User,
+  Mail,
+  Target,
+  Settings,
+  Save,
+  Scale,
+  Heart,
+  Shield,
+  Activity,
+  Sparkles,
+  Edit3,
+  Check,
+  AlertCircle,
+} from "lucide-react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
@@ -12,22 +26,45 @@ function Profile() {
     email: "",
     currentWeight: "",
     targetWeight: "",
+    dailyCalories: "",
     dietGoal: "",
     foodAllergies: "",
+    height: "",
+    age: "",
+    gender: "",
+    activityLevel: "",
   });
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  // Ambil data profil dari Firestore saat komponen dimuat
   useEffect(() => {
     const fetchProfile = async () => {
       if (currentUser) {
-        const docRef = doc(db, "users", currentUser.uid);
-        const docSnap = await getDoc(docRef);
+        try {
+          const docRef = doc(db, "users", currentUser.uid);
+          const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists()) {
-          setProfile(docSnap.data());
-        } else {
-          console.log("Tidak ada dokumen profil untuk pengguna ini!");
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            setProfile({
+              name: userData.name || "",
+              email: currentUser.email || "",
+              currentWeight: userData.currentWeight || "",
+              targetWeight: userData.targetWeight || "",
+              dailyCalories: userData.dailyCalories || "",
+              dietGoal: userData.dietGoal || "",
+              foodAllergies: userData.foodAllergies || "",
+              height: userData.height || "",
+              age: userData.age || "",
+              gender: userData.gender || "",
+              activityLevel: userData.activityLevel || "",
+            });
+          } else {
+            setProfile((prev) => ({ ...prev, email: currentUser.email || "" }));
+          }
+        } catch (error) {
+          console.error("Error fetching profile:", error);
         }
       }
       setLoading(false);
@@ -41,175 +78,395 @@ function Profile() {
     setProfile((prev) => ({ ...prev, [name]: value }));
   };
 
+  const calculateBMI = () => {
+    if (profile.currentWeight && profile.height) {
+      const weight = parseFloat(profile.currentWeight);
+      const height = parseFloat(profile.height) / 100; // Convert cm to meters
+      const bmi = weight / (height * height);
+      return bmi.toFixed(1);
+    }
+    return null;
+  };
+
+  const getBMIStatus = (bmi) => {
+    if (!bmi) return null;
+    const bmiValue = parseFloat(bmi);
+    if (bmiValue < 18.5)
+      return { status: "Underweight", color: "text-blue-600" };
+    if (bmiValue < 25) return { status: "Normal", color: "text-green-600" };
+    if (bmiValue < 30)
+      return { status: "Overweight", color: "text-yellow-600" };
+    return { status: "Obese", color: "text-red-600" };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!currentUser) return;
 
+    setSaving(true);
     try {
       const docRef = doc(db, "users", currentUser.uid);
-      await updateDoc(docRef, profile);
-      alert("Profil berhasil diperbarui!");
+      const profileData = { ...profile };
+      delete profileData.email; // Don't save email to Firestore
+
+      await updateDoc(docRef, profileData);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
       console.error("Gagal memperbarui profil:", err);
       alert("Gagal memperbarui profil.");
     }
+    setSaving(false);
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <p className="text-xl text-gray-500">Memuat profil...</p>
+      <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 flex justify-center items-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#F27F34] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-xl text-gray-600 font-medium">Memuat profil...</p>
+        </div>
       </div>
     );
   }
 
+  const bmi = calculateBMI();
+  const bmiStatus = getBMIStatus(bmi);
+
   return (
-    <div className="p-6 md:p-8">
-      {/* Header Halaman */}
-      <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-          Profil & Pengaturan
-        </h1>
-        <p className="text-gray-600">
-          Kelola informasi dan preferensi akun Anda di sini.
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#F27F34]/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 -left-40 w-96 h-96 bg-[#B23501]/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-[#FFD580]/20 rounded-full blur-2xl"></div>
       </div>
 
-      {/* Formulir Informasi Pribadi */}
-      <section className="bg-white p-6 rounded-xl shadow-lg mb-8">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center space-x-2">
-          <User className="h-6 w-6 text-[#B23501]" />
-          <span>Informasi Pribadi</span>
-        </h2>
-        <form className="space-y-6">
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Nama Lengkap
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={profile.name}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-            />
+      <div className="relative z-10 p-6 md:p-8">
+        {/* Header */}
+        <header className="mb-8">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-3 h-3 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+              Profile Settings
+            </span>
           </div>
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-semibold text-gray-700 mb-1"
+          <h1 className="text-4xl md:text-5xl font-black text-gray-800 mb-2">
+            <span className="bg-gradient-to-r from-[#F27F34] to-[#B23501] bg-clip-text text-transparent">
+              Profil
+            </span>{" "}
+            & Pengaturan
+          </h1>
+          <p className="text-xl text-gray-600">
+            Kelola informasi dan preferensi akun Anda
+          </p>
+        </header>
+
+        {/* Success Message */}
+        {showSuccess && (
+          <div className="mb-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white p-4 rounded-2xl shadow-xl flex items-center space-x-3">
+            <Check className="h-5 w-5" />
+            <span className="font-medium">Profil berhasil diperbarui!</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Personal Information */}
+          <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                <User className="h-6 w-6 mr-3 text-[#B23501]" />
+                Informasi Pribadi
+              </h2>
+              <Sparkles className="h-5 w-5 text-[#B23501]" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Nama Lengkap
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={profile.name}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                  placeholder="Masukkan nama lengkap Anda"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Email
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={currentUser?.email || ""}
+                    className="w-full px-4 py-3 rounded-xl bg-gray-100/70 border border-gray-200 text-gray-600 cursor-not-allowed"
+                    disabled
+                  />
+                  <Mail className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                </div>
+                <p className="mt-2 text-xs text-gray-500 flex items-center">
+                  <Shield className="h-3 w-3 mr-1" />
+                  Email tidak dapat diubah untuk keamanan
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Usia
+                </label>
+                <input
+                  type="number"
+                  name="age"
+                  value={profile.age}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                  placeholder="Usia dalam tahun"
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Jenis Kelamin
+                </label>
+                <select
+                  name="gender"
+                  value={profile.gender}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                >
+                  <option value="">Pilih jenis kelamin</option>
+                  <option value="Laki-laki">Laki-laki</option>
+                  <option value="Perempuan">Perempuan</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          {/* Body Measurements */}
+          <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                <Scale className="h-6 w-6 mr-3 text-[#B23501]" />
+                Pengukuran Tubuh
+              </h2>
+              <Activity className="h-5 w-5 text-[#B23501]" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Tinggi Badan (cm)
+                </label>
+                <input
+                  type="number"
+                  name="height"
+                  value={profile.height}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                  placeholder="170"
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Berat Badan Saat Ini (kg)
+                </label>
+                <input
+                  type="number"
+                  name="currentWeight"
+                  value={profile.currentWeight}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                  placeholder="70"
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Berat Badan Target (kg)
+                </label>
+                <input
+                  type="number"
+                  name="targetWeight"
+                  value={profile.targetWeight}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                  placeholder="65"
+                  min="1"
+                />
+              </div>
+            </div>
+
+            {/* BMI Calculator */}
+            {bmi && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-gray-800 mb-1">
+                      Body Mass Index (BMI)
+                    </h3>
+                    <p className="text-3xl font-black text-gray-800">{bmi}</p>
+                    {bmiStatus && (
+                      <p className={`text-sm font-semibold ${bmiStatus.color}`}>
+                        Status: {bmiStatus.status}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                    <Activity className="h-8 w-8 text-white" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Diet Preferences */}
+          <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                <Target className="h-6 w-6 mr-3 text-[#B23501]" />
+                Preferensi Diet
+              </h2>
+              <Heart className="h-5 w-5 text-[#B23501]" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Tujuan Diet Utama
+                </label>
+                <select
+                  name="dietGoal"
+                  value={profile.dietGoal}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                >
+                  <option value="">Pilih tujuan diet</option>
+                  <option value="Menurunkan Berat Badan">
+                    Menurunkan Berat Badan
+                  </option>
+                  <option value="Menambah Massa Otot">
+                    Menambah Massa Otot
+                  </option>
+                  <option value="Mempertahankan Berat Badan">
+                    Mempertahankan Berat Badan
+                  </option>
+                  <option value="Gaya Hidup Sehat">Gaya Hidup Sehat</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Target Kalori Harian
+                </label>
+                <input
+                  type="number"
+                  name="dailyCalories"
+                  value={profile.dailyCalories}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                  placeholder="2000"
+                  min="1000"
+                  max="5000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Tingkat Aktivitas
+                </label>
+                <select
+                  name="activityLevel"
+                  value={profile.activityLevel}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                >
+                  <option value="">Pilih tingkat aktivitas</option>
+                  <option value="Sangat Rendah">
+                    Sangat Rendah (Tidak olahraga)
+                  </option>
+                  <option value="Rendah">Rendah (Olahraga 1-3x/minggu)</option>
+                  <option value="Sedang">Sedang (Olahraga 3-5x/minggu)</option>
+                  <option value="Tinggi">Tinggi (Olahraga 6-7x/minggu)</option>
+                  <option value="Sangat Tinggi">
+                    Sangat Tinggi (Olahraga 2x/hari)
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Alergi Makanan
+                </label>
+                <input
+                  type="text"
+                  name="foodAllergies"
+                  value={profile.foodAllergies}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                  placeholder="Contoh: kacang, seafood, gluten"
+                />
+                <p className="mt-2 text-xs text-gray-500 flex items-center">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  Pisahkan dengan koma jika lebih dari satu
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Save Button */}
+          <div className="flex justify-center">
+            <button
+              type="submit"
+              disabled={saving}
+              className="group relative overflow-hidden bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white px-12 py-4 rounded-full font-bold shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center space-x-3"
             >
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={currentUser?.email || ""} // Perbaikan di sini
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-              disabled
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Email tidak bisa diubah.
-            </p>
+              <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+              {saving ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin relative z-10"></div>
+              ) : (
+                <Save className="h-5 w-5 relative z-10" />
+              )}
+              <span className="relative z-10">
+                {saving ? "Menyimpan..." : "Simpan Perubahan"}
+              </span>
+              {!saving && <Edit3 className="h-5 w-5 relative z-10" />}
+            </button>
           </div>
         </form>
-      </section>
 
-      {/* Formulir Preferensi Diet */}
-      <section className="bg-white p-6 rounded-xl shadow-lg mb-8">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center space-x-2">
-          <Target className="h-6 w-6 text-[#B23501]" />
-          <span>Preferensi Diet</span>
-        </h2>
-        <form className="space-y-6">
-          <div>
-            <label
-              htmlFor="currentWeight"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Berat Badan Saat Ini (kg)
-            </label>
-            <input
-              type="number"
-              id="currentWeight"
-              name="currentWeight"
-              value={profile.currentWeight}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-            />
+        {/* Tips Section */}
+        <section className="mt-8 bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-2xl border border-green-200">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <h3 className="font-bold text-gray-800">Tips Profil</h3>
           </div>
-          <div>
-            <label
-              htmlFor="targetWeight"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Berat Badan Target (kg)
-            </label>
-            <input
-              type="number"
-              id="targetWeight"
-              name="targetWeight"
-              value={profile.targetWeight}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="dietGoal"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Tujuan Diet Utama
-            </label>
-            <select
-              id="dietGoal"
-              name="dietGoal"
-              value={profile.dietGoal}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-            >
-              <option value="">Pilih Tujuan</option>
-              <option value="Menurunkan Berat Badan">
-                Menurunkan Berat Badan
-              </option>
-              <option value="Menambah Massa Otot">Menambah Massa Otot</option>
-              <option value="Gaya Hidup Sehat">Gaya Hidup Sehat</option>
-            </select>
-          </div>
-          <div>
-            <label
-              htmlFor="foodAllergies"
-              className="block text-sm font-semibold text-gray-700 mb-1"
-            >
-              Alergi Makanan (opsional)
-            </label>
-            <input
-              type="text"
-              id="foodAllergies"
-              name="foodAllergies"
-              value={profile.foodAllergies}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B23501]"
-              placeholder="Contoh: kacang, seafood"
-            />
-          </div>
-        </form>
-      </section>
-
-      {/* Tombol Simpan */}
-      <div className="flex justify-end mt-4">
-        <button
-          onClick={handleSubmit}
-          className="bg-[#B23501] text-white py-2.5 px-6 rounded-lg font-semibold hover:bg-[#F9A03F] transition-colors duration-200 flex items-center space-x-2"
-        >
-          <Save className="h-5 w-5" />
-          <span>Simpan Perubahan</span>
-        </button>
+          <ul className="text-gray-600 text-sm space-y-2">
+            <li>
+              • Lengkapi semua informasi untuk rekomendasi yang lebih akurat
+            </li>
+            <li>
+              • Update berat badan secara berkala untuk tracking yang lebih baik
+            </li>
+            <li>
+              • Target kalori akan membantu sistem memberikan saran menu yang
+              sesuai
+            </li>
+            <li>
+              • Informasi alergi akan membantu filter menu yang aman untuk Anda
+            </li>
+          </ul>
+        </section>
       </div>
     </div>
   );

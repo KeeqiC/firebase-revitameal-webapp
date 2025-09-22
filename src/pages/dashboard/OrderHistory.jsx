@@ -7,6 +7,10 @@ import {
   CreditCard,
   AlertCircle,
   CheckCircle,
+  Sparkles,
+  Activity,
+  ShoppingBag,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
@@ -64,25 +68,29 @@ function OrderHistory() {
       case "settlement":
       case "capture":
         return {
-          color: "bg-green-100 text-green-700",
+          color: "bg-green-500 text-white",
+          bgColor: "from-green-500/10 to-emerald-500/5",
           icon: CheckCircle,
           label: "Dibayar",
         };
       case "pending":
         return {
-          color: "bg-yellow-100 text-yellow-700",
+          color: "bg-yellow-500 text-white",
+          bgColor: "from-yellow-500/10 to-orange-500/5",
           icon: Clock,
           label: "Menunggu Pembayaran",
         };
       case "processing":
         return {
-          color: "bg-blue-100 text-blue-700",
+          color: "bg-blue-500 text-white",
+          bgColor: "from-blue-500/10 to-cyan-500/5",
           icon: Package,
           label: "Diproses",
         };
       case "delivered":
         return {
-          color: "bg-emerald-100 text-emerald-700",
+          color: "bg-emerald-500 text-white",
+          bgColor: "from-emerald-500/10 to-green-500/5",
           icon: CheckCircle,
           label: "Terkirim",
         };
@@ -91,13 +99,15 @@ function OrderHistory() {
       case "expire":
       case "deny":
         return {
-          color: "bg-red-100 text-red-700",
+          color: "bg-red-500 text-white",
+          bgColor: "from-red-500/10 to-pink-500/5",
           icon: AlertCircle,
           label: "Dibatalkan",
         };
       default:
         return {
-          color: "bg-gray-100 text-gray-700",
+          color: "bg-gray-500 text-white",
+          bgColor: "from-gray-500/10 to-slate-500/5",
           icon: Package,
           label: status || "Unknown",
         };
@@ -185,191 +195,284 @@ function OrderHistory() {
     }
   };
 
+  const getCurrentTime = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Pagi";
+    if (hour < 15) return "Siang";
+    if (hour < 18) return "Sore";
+    return "Malam";
+  };
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[50vh]">
+      <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 flex justify-center items-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#B23501] mx-auto mb-4"></div>
-          <p className="text-xl text-gray-500">Memuat riwayat pesanan...</p>
+          <div className="w-16 h-16 border-4 border-[#F27F34] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-xl text-gray-600 font-medium">
+            Memuat riwayat pesanan...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 md:p-8">
-      {/* Header Halaman */}
-      <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-          Riwayat Pesanan
-        </h1>
-        <p className="text-gray-600 mb-4">
-          Lihat semua pesanan <b>Lunch Boost</b> Anda sebelumnya.
-        </p>
-
-        {/* Filter Buttons */}
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: "all", label: "Semua", count: orders.length },
-            {
-              key: "pending",
-              label: "Menunggu",
-              count: orders.filter((o) => o.status === "pending").length,
-            },
-            {
-              key: "paid",
-              label: "Dibayar",
-              count: orders.filter((o) =>
-                [
-                  "paid",
-                  "settlement",
-                  "capture",
-                  "processing",
-                  "delivered",
-                ].includes(o.status)
-              ).length,
-            },
-            {
-              key: "cancelled",
-              label: "Dibatalkan",
-              count: orders.filter((o) =>
-                ["cancelled", "cancel", "expire", "deny"].includes(o.status)
-              ).length,
-            },
-          ].map((filterOption) => (
-            <button
-              key={filterOption.key}
-              onClick={() => setFilter(filterOption.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === filterOption.key
-                  ? "bg-[#B23501] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {filterOption.label} ({filterOption.count})
-            </button>
-          ))}
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#F27F34]/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 -left-40 w-96 h-96 bg-[#B23501]/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-[#FFD580]/20 rounded-full blur-2xl"></div>
       </div>
 
-      {/* Daftar Pesanan */}
-      <section className="space-y-6">
-        {filteredOrders.length > 0 ? (
-          filteredOrders.map((order) => {
-            const statusInfo = getStatusInfo(order.status);
-            const StatusIcon = statusInfo.icon;
+      <div className="relative z-10 p-6 md:p-8">
+        {/* Enhanced Header - consistent with Dashboard */}
+        <header className="mb-8">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-3 h-3 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+              Selamat {getCurrentTime()}
+            </span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black text-gray-800 mb-2">
+            Riwayat{" "}
+            <span className="bg-gradient-to-r from-[#F27F34] to-[#B23501] bg-clip-text text-transparent">
+              Pesanan
+            </span>
+          </h1>
+          <p className="text-xl text-gray-600">
+            Lihat semua pesanan Lunch Boost Anda sebelumnya
+          </p>
+        </header>
 
-            return (
-              <div
-                key={order.id}
-                className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-200"
+        {/* Enhanced Filter Section */}
+        <div className="bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-2xl font-bold text-gray-800 flex items-center">
+              <Activity className="h-6 w-6 mr-3 text-[#B23501]" />
+              Filter Pesanan
+            </h3>
+            <span className="text-sm text-gray-500 bg-white/50 px-3 py-1 rounded-full">
+              {orders.length} total pesanan
+            </span>
+          </div>
+
+          {/* Enhanced Filter Buttons */}
+          <div className="flex flex-wrap gap-3">
+            {[
+              {
+                key: "all",
+                label: "Semua",
+                count: orders.length,
+                color: "from-gray-500 to-slate-600",
+              },
+              {
+                key: "pending",
+                label: "Menunggu",
+                count: orders.filter((o) => o.status === "pending").length,
+                color: "from-yellow-500 to-orange-500",
+              },
+              {
+                key: "paid",
+                label: "Dibayar",
+                count: orders.filter((o) =>
+                  [
+                    "paid",
+                    "settlement",
+                    "capture",
+                    "processing",
+                    "delivered",
+                  ].includes(o.status)
+                ).length,
+                color: "from-green-500 to-emerald-600",
+              },
+              {
+                key: "cancelled",
+                label: "Dibatalkan",
+                count: orders.filter((o) =>
+                  ["cancelled", "cancel", "expire", "deny"].includes(o.status)
+                ).length,
+                color: "from-red-500 to-pink-600",
+              },
+            ].map((filterOption) => (
+              <button
+                key={filterOption.key}
+                onClick={() => setFilter(filterOption.key)}
+                className={`group relative overflow-hidden px-6 py-3 rounded-full text-sm font-bold transition-all duration-300 hover:scale-105 ${
+                  filter === filterOption.key
+                    ? `bg-gradient-to-r ${filterOption.color} text-white shadow-lg`
+                    : "bg-white/50 text-gray-700 hover:bg-white/70 border border-white/30"
+                }`}
               >
-                {/* Header Pesanan */}
-                <div className="flex justify-between items-start mb-4 border-b pb-4">
-                  <div className="flex items-start space-x-4">
-                    <Package className="h-8 w-8 text-[#B23501] mt-1" />
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-800">
-                        Pesanan #{order.id.substring(0, 8)}
-                      </h3>
-                      <p className="text-sm text-gray-500 flex items-center mt-1">
-                        <Calendar className="h-4 w-4 mr-1" />
-                        {order.createdAt
-                          ? format(
-                              order.createdAt.toDate(),
-                              "d MMMM yyyy, HH:mm",
-                              { locale: id }
-                            )
-                          : "Tanggal tidak diketahui"}
-                      </p>
-                      {/* Payment Type */}
-                      {order.paymentType && (
-                        <p className="text-sm text-gray-500 flex items-center mt-1">
-                          <CreditCard className="h-4 w-4 mr-1" />
-                          {order.paymentType}
-                        </p>
+                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+                <span className="relative z-10">
+                  {filterOption.label} ({filterOption.count})
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Enhanced Orders List */}
+        <section className="space-y-6">
+          {filteredOrders.length > 0 ? (
+            filteredOrders.map((order) => {
+              const statusInfo = getStatusInfo(order.status);
+              const StatusIcon = statusInfo.icon;
+
+              return (
+                <div
+                  key={order.id}
+                  className="group relative overflow-hidden bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-102"
+                >
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br ${statusInfo.bgColor} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+                  ></div>
+
+                  <div className="relative">
+                    {/* Enhanced Header Pesanan */}
+                    <div className="flex justify-between items-start mb-6 border-b border-white/20 pb-6">
+                      <div className="flex items-start space-x-4">
+                        <div className="w-12 h-12 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-2xl flex items-center justify-center shadow-lg">
+                          <ShoppingBag className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-800 mb-2">
+                            Pesanan #{order.id.substring(0, 8)}
+                          </h3>
+                          <div className="flex items-center space-x-4 text-sm text-gray-600">
+                            <span className="flex items-center space-x-1">
+                              <Calendar className="h-4 w-4" />
+                              <span>
+                                {order.createdAt
+                                  ? format(
+                                      order.createdAt.toDate(),
+                                      "d MMMM yyyy, HH:mm",
+                                      { locale: id }
+                                    )
+                                  : "Tanggal tidak diketahui"}
+                              </span>
+                            </span>
+                            {order.paymentType && (
+                              <span className="flex items-center space-x-1">
+                                <CreditCard className="h-4 w-4" />
+                                <span>{order.paymentType}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div
+                          className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full font-bold text-sm shadow-lg ${statusInfo.color}`}
+                        >
+                          <StatusIcon className="h-4 w-4" />
+                          <span>{statusInfo.label}</span>
+                        </div>
+
+                        {/* Enhanced Retry Payment Button for Pending Orders */}
+                        {order.status === "pending" && (
+                          <button
+                            onClick={() => handleRetryPayment(order)}
+                            className="group mt-3 inline-flex items-center space-x-2 bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white px-4 py-2 rounded-full text-sm font-bold hover:shadow-lg transition-all duration-300 hover:scale-105"
+                          >
+                            <RefreshCw className="h-4 w-4 group-hover:rotate-180 transition-transform duration-300" />
+                            <span>Bayar Sekarang</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Enhanced Item Pesanan */}
+                    <div className="space-y-4 mb-6">
+                      {order.items?.length > 0 ? (
+                        order.items.map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex justify-between items-center p-4 bg-white/30 rounded-2xl backdrop-blur-sm"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-xl flex items-center justify-center">
+                                <Package className="h-5 w-5 text-white" />
+                              </div>
+                              <div>
+                                <span className="font-semibold text-gray-800">
+                                  {item.name}
+                                </span>
+                                <div className="text-sm text-gray-600">
+                                  Qty: {item.quantity}
+                                </div>
+                              </div>
+                            </div>
+                            <span className="font-bold text-gray-800">
+                              Rp{item.price.toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 bg-white/20 rounded-2xl">
+                          <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-gray-500 italic">
+                            Tidak ada item di pesanan ini.
+                          </p>
+                        </div>
                       )}
                     </div>
-                  </div>
 
-                  <div className="text-right">
-                    <div
-                      className={`px-3 py-1 rounded-full font-semibold text-sm capitalize flex items-center space-x-1 ${statusInfo.color}`}
-                    >
-                      <StatusIcon className="h-4 w-4" />
-                      <span>{statusInfo.label}</span>
+                    {/* Enhanced Total */}
+                    <div className="flex justify-between items-center pt-6 border-t border-white/20">
+                      <div className="flex items-center space-x-2">
+                        <Sparkles className="h-5 w-5 text-[#B23501]" />
+                        <span className="font-bold text-xl text-gray-800">
+                          Total Pembayaran
+                        </span>
+                      </div>
+                      <span className="font-black text-2xl bg-gradient-to-r from-[#F27F34] to-[#B23501] bg-clip-text text-transparent">
+                        Rp{order.total?.toLocaleString("id-ID") || 0}
+                      </span>
                     </div>
 
-                    {/* Retry Payment Button for Pending Orders */}
-                    {order.status === "pending" && (
-                      <button
-                        onClick={() => handleRetryPayment(order)}
-                        className="mt-2 px-3 py-1 bg-[#B23501] text-white text-sm rounded-lg hover:bg-[#8B1D00] transition-colors"
-                      >
-                        Bayar Sekarang
-                      </button>
+                    {/* Transaction ID */}
+                    {order.transactionId && (
+                      <div className="mt-4 p-3 bg-white/20 rounded-xl">
+                        <span className="text-sm text-gray-600">
+                          ID Transaksi:{" "}
+                        </span>
+                        <span className="text-sm font-mono font-semibold text-gray-800">
+                          {order.transactionId}
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
-
-                {/* Item Pesanan */}
-                <div className="space-y-3">
-                  {order.items?.length > 0 ? (
-                    order.items.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex justify-between text-gray-600"
-                      >
-                        <span>
-                          {item.quantity} x {item.name}
-                        </span>
-                        <span>Rp{item.price.toLocaleString("id-ID")}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-400 italic">
-                      Tidak ada item di pesanan ini.
-                    </p>
-                  )}
-                </div>
-
-                {/* Total */}
-                <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                  <span className="font-bold text-lg">Total</span>
-                  <span className="font-bold text-xl text-[#B23501]">
-                    Rp{order.total?.toLocaleString("id-ID") || 0}
-                  </span>
-                </div>
-
-                {/* Transaction ID if available */}
-                {order.transactionId && (
-                  <div className="mt-2 text-sm text-gray-500">
-                    ID Transaksi: {order.transactionId}
-                  </div>
-                )}
+              );
+            })
+          ) : (
+            <div className="text-center py-20 bg-white/70 backdrop-blur-xl border border-white/30 rounded-3xl shadow-xl">
+              <div className="w-24 h-24 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
+                <ShoppingBag className="h-12 w-12 text-white" />
               </div>
-            );
-          })
-        ) : (
-          <div className="text-center py-20 text-gray-500 bg-white rounded-xl shadow-lg">
-            <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-xl font-medium mb-2">
-              {filter === "all"
-                ? "Belum ada pesanan"
-                : `Tidak ada pesanan ${
-                    filter === "pending"
-                      ? "yang menunggu pembayaran"
-                      : filter === "paid"
-                      ? "yang sudah dibayar"
-                      : "yang dibatalkan"
-                  }`}
-            </p>
-            <p className="text-gray-400">
-              Pesanan Anda akan muncul di sini setelah melakukan pembelian
-            </p>
-          </div>
-        )}
-      </section>
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                {filter === "all"
+                  ? "Belum Ada Pesanan"
+                  : `Tidak Ada Pesanan ${
+                      filter === "pending"
+                        ? "yang Menunggu Pembayaran"
+                        : filter === "paid"
+                        ? "yang Sudah Dibayar"
+                        : "yang Dibatalkan"
+                    }`}
+              </h3>
+              <p className="text-gray-600 max-w-md mx-auto leading-relaxed">
+                {filter === "all"
+                  ? "Mulai pesan makanan sehat dari menu Lunch Boost untuk melihat riwayat pesanan Anda"
+                  : "Pesanan dengan status ini akan muncul di sini"}
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

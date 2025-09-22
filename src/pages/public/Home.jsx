@@ -21,7 +21,7 @@ import MenuPreviewSection from "../../components/MenuPreviewSection";
 
 function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F27F34] via-[#E06B2A] to-[#B23501] text-white relative overflow-hidden">
+    <div id="home-section" className="min-h-screen bg-gradient-to-br from-[#F27F34] via-[#E06B2A] to-[#B23501] text-white relative overflow-hidden">
       {/* Floating Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/5 rounded-full blur-3xl"></div>
