@@ -1,5 +1,16 @@
-// src/pages/public/Home.jsx
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+// Import firebase dan auth.
+import { initializeApp, getApps } from "firebase/app";
+import {
+  getFirestore,
+  collection,
+  query,
+  onSnapshot,
+  orderBy,
+} from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
 import {
   Award,
   Star,
@@ -12,16 +23,106 @@ import {
   ArrowRight,
   Play,
   Sparkles,
+  Flame,
+  Activity,
+  Tag,
+  UtensilsCrossed,
+  Utensils,
+  BookA,
 } from "lucide-react";
 
 import heroImage from "../../assets/hero.jpg";
 import phone1Image from "../../assets/phone1.png";
 import phone2Image from "../../assets/phone2.png";
-import MenuPreviewSection from "../../components/MenuPreviewSection";
+
+// --- Mock Firebase & Auth Setup ---
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID",
+};
+
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const useAuth = () => {
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return unsubscribe;
+  }, []);
+
+  return { currentUser };
+};
+// --- End Mock Setup ---
 
 function Home() {
+  const [ingredientsData, setIngredientsData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Kategori untuk Database Bahan
+  const ingredientCategories = [
+    {
+      value: "nasi",
+      label: "Nasi & Karbohidrat",
+      color: "from-amber-500 to-orange-600",
+    },
+    {
+      value: "protein-hewani",
+      label: "Protein Hewani",
+      color: "from-red-500 to-pink-600",
+    },
+    {
+      value: "protein-nabati",
+      label: "Protein Nabati",
+      color: "from-lime-500 to-green-600",
+    },
+    {
+      value: "sayuran",
+      label: "Sayuran",
+      color: "from-green-500 to-emerald-600",
+    },
+    {
+      value: "buah",
+      label: "Buah-buahan",
+      color: "from-yellow-400 to-orange-500",
+    },
+    { value: "snack", label: "Snack", color: "from-purple-500 to-violet-600" },
+    { value: "minuman", label: "Minuman", color: "from-blue-500 to-cyan-600" },
+  ];
+
+  const getCategoryInfo = (category) => {
+    return ingredientCategories.find((c) => c.value === category) || {};
+  };
+
+  useEffect(() => {
+    const ingredientsCollectionRef = collection(db, "revitameal_ingredients");
+    const q = query(ingredientsCollectionRef, orderBy("category", "asc"));
+
+    const unsubIngredients = onSnapshot(q, (snapshot) => {
+      const ingredients = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setIngredientsData(ingredients);
+      setLoading(false);
+    });
+
+    return () => unsubIngredients();
+  }, []);
+
   return (
-    <div id="home-section" className="min-h-screen bg-gradient-to-br from-[#F27F34] via-[#E06B2A] to-[#B23501] text-white relative overflow-hidden">
+    <div
+      id="home-section"
+      className="min-h-screen bg-gradient-to-br from-[#F27F34] via-[#E06B2A] to-[#B23501] text-white relative overflow-hidden"
+    >
       {/* Floating Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/5 rounded-full blur-3xl"></div>
@@ -107,8 +208,104 @@ function Home() {
         </div>
       </section>
 
-      {/* Menu Preview Section */}
-      <MenuPreviewSection />
+      {/* Ingredients Preview Section */}
+      <section className="relative py-24 px-4 md:px-8 bg-orange-100 backdrop-blur-xl text-gray-800">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Pilihan Menu Kami
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Telusuri koleksi menu-menu lezat yang dirancang khusus untuk
+              mendukung gaya hidup sehat Anda.
+            </p>
+          </div>
+          {loading ? (
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p>Memuat menu...</p>
+            </div>
+          ) : ingredientsData.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {ingredientsData.map((ingredient) => {
+                const categoryInfo = getCategoryInfo(ingredient.category);
+                return (
+                  <div
+                    key={ingredient.id}
+                    className="bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group"
+                  >
+                    <div className="relative h-48 sm:h-56">
+                      <img
+                        src={
+                          ingredient.image_url ||
+                          `https://placehold.co/600x400/FFF8DC/B23501?text=REVITA+MEAL`
+                        }
+                        alt={ingredient.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        onError={(e) => {
+                          e.target.src = `https://placehold.co/600x400/FFF8DC/B23501?text=REVITA+MEAL`;
+                          e.target.style.objectFit = "contain";
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <h3 className="text-xl font-bold text-white mb-1 leading-snug">
+                          {ingredient.name}
+                        </h3>
+                        <div className="flex items-center space-x-2 text-sm font-semibold text-white/90">
+                          <BookA className="h-4 w-4 mr-1 text-gray-200" />
+                          <span>{categoryInfo.label}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-3">
+                        {ingredient.description ||
+                          "Deskripsi komponen tidak tersedia."}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold mb-4">
+                        <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                          {parseFloat(ingredient.calories || 0).toFixed(0)} kcal
+                        </span>
+                        <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                          {parseFloat(ingredient.protein || 0).toFixed(1)}g
+                          Protein
+                        </span>
+                        <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                          {parseFloat(ingredient.carbs || 0).toFixed(1)}g Karbo
+                        </span>
+                        <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                          {parseFloat(ingredient.fats || 0).toFixed(1)}g Lemak
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-[#B23501]">
+                          {ingredient.weight} {ingredient.unit}
+                        </span>
+                        <Link
+                          to="/login"
+                          className="group relative inline-flex items-center space-x-2 bg-gradient-to-r from-[#F9A03F] to-[#FFD580] text-[#B23501] px-4 py-2 rounded-full font-bold text-sm shadow-md hover:shadow-lg transition-all duration-300"
+                        >
+                          <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+                          <span className="relative z-10">Lihat</span>
+                          <ArrowRight className="h-4 w-4 relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <UtensilsCrossed className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">
+                Tidak ada menu yang tersedia saat ini.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* About Section */}
       <section id="about-section" className="relative py-24 px-4 md:px-8">

@@ -26,7 +26,7 @@ function Sidebar({ toggleSidebar }) {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate("/login");
+      navigate("/");
       toggleSidebar();
     } catch (error) {
       console.error("Gagal logout:", error);
@@ -38,13 +38,48 @@ function Sidebar({ toggleSidebar }) {
   };
 
   const navigationItems = [
-    { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", color: "from-blue-500 to-blue-600" },
-    { to: "/dashboard/lunch-boost", icon: Utensils, label: "Lunch Boost", color: "from-green-500 to-green-600" },
-    { to: "/dashboard/diet-planner", icon: ClipboardList, label: "Diet Planner", color: "from-purple-500 to-purple-600" },
-    { to: "/dashboard/calorie-tracker", icon: Flame, label: "Kalori Tracker", color: "from-red-500 to-red-600" },
-    { to: "/dashboard/food-journal", icon: FileText, label: "Food Journal", color: "from-yellow-500 to-yellow-600" },
-    { to: "/dashboard/fitness-guide", icon: Dumbbell, label: "Fitness Guide", color: "from-indigo-500 to-indigo-600" },
-    { to: "/dashboard/chibo", icon: Bot, label: "Chibo Assistant", color: "from-cyan-500 to-cyan-600" },
+    {
+      to: "/dashboard",
+      icon: LayoutDashboard,
+      label: "Dashboard",
+      color: "from-blue-500 to-blue-600",
+    },
+    {
+      to: "/dashboard/lunch-boost",
+      icon: Utensils,
+      label: "Lunch Boost",
+      color: "from-green-500 to-green-600",
+    },
+    {
+      to: "/dashboard/diet-planner",
+      icon: ClipboardList,
+      label: "Diet Planner",
+      color: "from-purple-500 to-purple-600",
+    },
+    {
+      to: "/dashboard/calorie-tracker",
+      icon: Flame,
+      label: "Kalori Tracker",
+      color: "from-red-500 to-red-600",
+    },
+    {
+      to: "/dashboard/food-journal",
+      icon: FileText,
+      label: "Food Journal",
+      color: "from-yellow-500 to-yellow-600",
+    },
+    {
+      to: "/dashboard/fitness-guide",
+      icon: Dumbbell,
+      label: "Fitness Guide",
+      color: "from-indigo-500 to-indigo-600",
+    },
+    {
+      to: "/dashboard/chibo",
+      icon: Bot,
+      label: "Chibo Assistant",
+      color: "from-cyan-500 to-cyan-600",
+    },
   ];
 
   const profileItems = [
@@ -53,12 +88,12 @@ function Sidebar({ toggleSidebar }) {
   ];
 
   return (
-    <div 
+    <div
       className="w-64 bg-gradient-to-b from-[#F27F34] via-[#E06B2A] to-[#B23501] shadow-2xl relative overflow-hidden"
-      style={{ 
-        height: '100vh',
-        display: 'flex',
-        flexDirection: 'column'
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {/* Background Effects */}
@@ -80,11 +115,13 @@ function Sidebar({ toggleSidebar }) {
             />
           </div>
           <div>
-            <h2 className="text-xl font-black text-white tracking-wide">REVITAMEAL</h2>
+            <h2 className="text-xl font-black text-white tracking-wide">
+              REVITAMEAL
+            </h2>
             <p className="text-xs text-white/70 font-medium">Dashboard</p>
           </div>
         </div>
-        
+
         <button
           onClick={toggleSidebar}
           className="md:hidden p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all duration-300 backdrop-blur-sm"
@@ -99,14 +136,18 @@ function Sidebar({ toggleSidebar }) {
           <div className="flex items-center space-x-3 p-3 bg-white/10 rounded-xl backdrop-blur-sm">
             <div className="w-10 h-10 bg-gradient-to-r from-[#F9A03F] to-[#FFD580] rounded-full flex items-center justify-center">
               <span className="text-[#B23501] font-bold text-sm">
-                {currentUser.displayName?.charAt(0) || currentUser.email?.charAt(0) || 'U'}
+                {currentUser.displayName?.charAt(0) ||
+                  currentUser.email?.charAt(0) ||
+                  "U"}
               </span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white font-semibold text-sm truncate">
-                {currentUser.displayName || 'User'}
+                {currentUser.displayName || "User"}
               </p>
-              <p className="text-white/70 text-xs truncate">{currentUser.email}</p>
+              <p className="text-white/70 text-xs truncate">
+                {currentUser.email}
+              </p>
             </div>
             <Sparkles className="h-4 w-4 text-[#FFD580]" />
           </div>
@@ -114,11 +155,11 @@ function Sidebar({ toggleSidebar }) {
       )}
 
       {/* Scrollable Content */}
-      <div 
+      <div
         className="flex-1 relative z-10 overflow-y-auto"
         style={{
-          scrollbarWidth: 'thin',
-          scrollbarColor: 'rgba(255, 255, 255, 0.2) transparent'
+          scrollbarWidth: "thin",
+          scrollbarColor: "rgba(255, 255, 255, 0.2) transparent",
         }}
       >
         {/* Main Navigation */}
@@ -130,7 +171,7 @@ function Sidebar({ toggleSidebar }) {
             {navigationItems.map((item) => {
               const IconComponent = item.icon;
               const isActive = isActiveLink(item.to);
-              
+
               return (
                 <Link
                   key={item.to}
@@ -138,24 +179,28 @@ function Sidebar({ toggleSidebar }) {
                   onClick={toggleSidebar}
                   className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden ${
                     isActive
-                      ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm'
-                      : 'text-white/90 hover:text-white hover:bg-white/10'
+                      ? "bg-white/20 text-white shadow-lg backdrop-blur-sm"
+                      : "text-white/90 hover:text-white hover:bg-white/10"
                   }`}
                 >
                   {/* Icon Background */}
-                  <div className={`w-8 h-8 bg-gradient-to-r ${item.color} rounded-lg flex items-center justify-center shadow-lg ${
-                    isActive ? 'scale-110' : 'group-hover:scale-110'
-                  } transition-transform duration-300`}>
+                  <div
+                    className={`w-8 h-8 bg-gradient-to-r ${
+                      item.color
+                    } rounded-lg flex items-center justify-center shadow-lg ${
+                      isActive ? "scale-110" : "group-hover:scale-110"
+                    } transition-transform duration-300`}
+                  >
                     <IconComponent className="h-4 w-4 text-white" />
                   </div>
-                  
+
                   <span className="font-semibold text-sm">{item.label}</span>
-                  
+
                   {/* Active indicator */}
                   {isActive && (
                     <div className="absolute right-2 w-2 h-2 bg-[#FFD580] rounded-full"></div>
                   )}
-                  
+
                   {/* Hover effect */}
                   <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl"></div>
                 </Link>
@@ -170,12 +215,12 @@ function Sidebar({ toggleSidebar }) {
         <p className="text-xs font-semibold text-white/60 uppercase tracking-wider px-3 mb-3">
           Account
         </p>
-        
+
         <div className="space-y-2">
           {profileItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = isActiveLink(item.to);
-            
+
             return (
               <Link
                 key={item.to}
@@ -183,8 +228,8 @@ function Sidebar({ toggleSidebar }) {
                 onClick={toggleSidebar}
                 className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
                   isActive
-                    ? 'bg-white/20 text-white shadow-lg'
-                    : 'text-white/90 hover:text-white hover:bg-white/10'
+                    ? "bg-white/20 text-white shadow-lg"
+                    : "text-white/90 hover:text-white hover:bg-white/10"
                 }`}
               >
                 <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center group-hover:bg-white/20 transition-colors duration-300">

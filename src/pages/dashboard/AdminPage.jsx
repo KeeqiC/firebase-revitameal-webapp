@@ -40,6 +40,10 @@ import {
   Coffee,
   Utensils,
   Tag,
+  Soup,
+  Egg,
+  Salad,
+  Apple,
 } from "lucide-react";
 
 // --- Mock Firebase & Auth Setup ---
@@ -78,7 +82,7 @@ const useAuth = () => {
 function AdminPage() {
   const { currentUser } = useAuth();
 
-  // State untuk Database Bahan (Ingredient Database)
+  // State for Ingredient Database
   const [ingredient, setIngredient] = useState({
     name: "",
     calories: "",
@@ -92,7 +96,7 @@ function AdminPage() {
     description: "",
   });
 
-  // State untuk Database Menu (Menu Templates)
+  // State for Menu Templates
   const [menuTemplate, setMenuTemplate] = useState({
     name: "",
     type: "paket-campuran",
@@ -126,38 +130,53 @@ function AdminPage() {
 
   const adminUid = "x1QFpZjvvBfGLNugPfaXI3eF0zf1";
 
-  // Kategori untuk Database Bahan
+  // Categories for Ingredient Database
   const ingredientCategories = [
     {
       value: "nasi",
       label: "Nasi & Karbohidrat",
       color: "from-amber-500 to-orange-600",
+      icon: Soup,
     },
     {
       value: "protein-hewani",
       label: "Protein Hewani",
       color: "from-red-500 to-pink-600",
+      icon: Egg,
     },
     {
       value: "protein-nabati",
       label: "Protein Nabati",
       color: "from-lime-500 to-green-600",
+      icon: ChefHat,
     },
     {
       value: "sayuran",
       label: "Sayuran",
       color: "from-green-500 to-emerald-600",
+      icon: Salad,
     },
     {
       value: "buah",
       label: "Buah-buahan",
       color: "from-yellow-400 to-orange-500",
+      icon: Apple,
     },
-    { value: "snack", label: "Snack", color: "from-purple-500 to-violet-600" },
-    { value: "minuman", label: "Minuman", color: "from-blue-500 to-cyan-600" },
+    {
+      value: "snack",
+      label: "Snack",
+      color: "from-purple-500 to-violet-600",
+      icon: Coffee,
+    },
+    {
+      value: "minuman",
+      label: "Minuman",
+      color: "from-blue-500 to-cyan-600",
+      icon: Utensils,
+    },
   ];
 
-  // Template untuk Database Menu
+  // Templates for Menu Database
   const menuTemplateTypes = [
     {
       value: "paket-campuran",
@@ -176,7 +195,7 @@ function AdminPage() {
   useEffect(() => {
     if (currentUser?.uid !== adminUid) return;
 
-    // Load Database Bahan
+    // Load Ingredient Database
     const ingredientsQuery = query(
       collection(db, "revitameal_ingredients"),
       orderBy("category", "asc")
@@ -190,7 +209,7 @@ function AdminPage() {
       setFilteredIngredients(ingredients);
     });
 
-    // Load Database Menu Templates
+    // Load Menu Templates Database
     const templatesQuery = query(
       collection(db, "revitameal_menu_templates"),
       orderBy("type", "asc")
@@ -449,6 +468,33 @@ function AdminPage() {
           showMessage("Bahan berhasil ditambahkan!", "success");
         }
       } else {
+        // Logika baru untuk menghitung total nutrisi
+        let allIngredientIds = [];
+        if (menuTemplate.components) {
+          allIngredientIds = Object.values(menuTemplate.components).flatMap(
+            (comp) => comp.options || []
+          );
+        }
+
+        const totals = allIngredientIds.reduce(
+          (acc, id) => {
+            const ingredient = ingredientsData.find((item) => item.id === id);
+            if (ingredient) {
+              acc.totalCalories += ingredient.calories || 0;
+              acc.totalProtein += ingredient.protein || 0;
+              acc.totalCarbs += ingredient.carbs || 0;
+              acc.totalFats += ingredient.fats || 0;
+            }
+            return acc;
+          },
+          {
+            totalCalories: 0,
+            totalProtein: 0,
+            totalCarbs: 0,
+            totalFats: 0,
+          }
+        );
+
         const newTemplate = {
           name: menuTemplate.name.trim(),
           type: menuTemplate.type,
@@ -468,6 +514,11 @@ function AdminPage() {
           components: menuTemplate.components,
           dietOptions: menuTemplate.dietOptions,
           dietPriceAdd: menuTemplate.dietPriceAdd,
+          // Tambahkan total nutrisi hasil kalkulasi
+          calories: totals.totalCalories,
+          protein: totals.totalProtein,
+          carbs: totals.totalCarbs,
+          fats: totals.totalFats,
         };
 
         if (editingTemplate) {
@@ -501,6 +552,47 @@ function AdminPage() {
     return ingredientsData.find((item) => item.id === id);
   };
 
+  // Custom Hook for Modal/Confirmation Logic
+  const useModal = () => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalContent, setModalContent] = useState({});
+    const [onConfirm, setOnConfirm] = useState(null);
+
+    const openModal = (content, onConfirmAction) => {
+      setModalContent(content);
+      setOnConfirm(() => onConfirmAction);
+      setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+      setIsModalOpen(false);
+    };
+
+    const handleConfirm = () => {
+      if (onConfirm) {
+        onConfirm();
+      }
+      closeModal();
+    };
+
+    return { isModalOpen, modalContent, openModal, closeModal, handleConfirm };
+  };
+
+  const { isModalOpen, modalContent, openModal, closeModal, handleConfirm } =
+    useModal();
+
+  const handleDeletionWithModal = (id, type) => {
+    openModal(
+      {
+        title: "Konfirmasi Penghapusan",
+        message: "Apakah Anda yakin ingin menghapus item ini?",
+        confirmText: "Hapus",
+        cancelText: "Batal",
+      },
+      () => handleDelete(id, type)
+    );
+  };
+
   if (currentUser?.uid !== adminUid) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-500/10 via-pink-500/10 to-red-600/20 flex justify-center items-center">
@@ -520,7 +612,7 @@ function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-x-hidden p-4 sm:p-6 md:p-8 lg:p-12">
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#F27F34]/10 rounded-full blur-3xl"></div>
@@ -528,13 +620,13 @@ function AdminPage() {
         <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-[#FFD580]/20 rounded-full blur-2xl"></div>
       </div>
 
-      <div className="relative z-10 p-6 md:p-8">
+      <div className="relative z-10 max-w-7xl mx-auto">
         {/* Header */}
         <header className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-3 h-3 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-full animate-pulse"></div>
             <span className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-              Revitameal Admin Panel - Arsitektur Baru
+              Revitameal Admin Panel
             </span>
           </div>
           <h1 className="text-4xl md:text-5xl font-black text-gray-800 mb-2">
@@ -543,7 +635,7 @@ function AdminPage() {
             </span>{" "}
             Management
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-base sm:text-lg text-gray-600">
             Kelola Database Bahan dan Template Menu Revitameal
           </p>
         </header>
@@ -567,7 +659,7 @@ function AdminPage() {
         )}
 
         {/* Enhanced Stats */}
-        <section className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
           <div className="bg-white/70 backdrop-blur-xl border border-white/30 p-6 rounded-2xl shadow-xl">
             <div className="flex items-center justify-between">
               <div>
@@ -610,7 +702,7 @@ function AdminPage() {
                   }
                 </p>
               </div>
-              <Utensils className="h-8 w-8 text-red-500" />
+              <Egg className="h-8 w-8 text-red-500" />
             </div>
           </div>
 
@@ -626,7 +718,7 @@ function AdminPage() {
                   }
                 </p>
               </div>
-              <ChefHat className="h-8 w-8 text-green-500" />
+              <Salad className="h-8 w-8 text-green-500" />
             </div>
           </div>
         </section>
@@ -640,7 +732,7 @@ function AdminPage() {
                 setShowForm(false);
                 handleReset();
               }}
-              className={`flex-1 px-8 py-6 flex items-center justify-center space-x-3 font-bold transition-all duration-300 ${
+              className={`flex-1 px-4 sm:px-8 py-4 sm:py-6 flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-3 font-bold transition-all duration-300 ${
                 activeTab === "ingredients"
                   ? "bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white shadow-lg"
                   : "text-gray-600 hover:bg-gray-50"
@@ -659,7 +751,7 @@ function AdminPage() {
                 setShowForm(false);
                 handleReset();
               }}
-              className={`flex-1 px-8 py-6 flex items-center justify-center space-x-3 font-bold transition-all duration-300 ${
+              className={`flex-1 px-4 sm:px-8 py-4 sm:py-6 flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-3 font-bold transition-all duration-300 ${
                 activeTab === "templates"
                   ? "bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white shadow-lg"
                   : "text-gray-600 hover:bg-gray-50"
@@ -677,10 +769,10 @@ function AdminPage() {
         {/* Controls */}
         <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-6 rounded-3xl shadow-xl mb-8">
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between space-y-4 lg:space-y-0">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 w-full lg:w-auto">
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="group relative overflow-hidden bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white px-6 py-3 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center space-x-2"
+                className="group relative overflow-hidden bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white px-6 py-3 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex-1 flex justify-center items-center space-x-2"
               >
                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
                 {showForm ? (
@@ -698,8 +790,8 @@ function AdminPage() {
               </button>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <div className="relative">
+            <div className="flex items-center space-x-4 w-full lg:w-auto mt-4 lg:mt-0">
+              <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
@@ -708,7 +800,7 @@ function AdminPage() {
                   }...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                  className="w-full pl-10 pr-4 py-2 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
                 />
               </div>
             </div>
@@ -718,8 +810,8 @@ function AdminPage() {
         {/* Form Section */}
         {showForm && (
           <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+            <div className="flex items-center justify-between flex-wrap mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center mb-2 sm:mb-0">
                 <Settings className="h-6 w-6 mr-3 text-[#B23501]" />
                 {activeTab === "ingredients"
                   ? editingIngredient
@@ -874,7 +966,6 @@ function AdminPage() {
                         onChange={handleIngredientChange}
                         className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
                         placeholder="0.6"
-                        required
                       />
                     </div>
                   </div>
@@ -1166,12 +1257,13 @@ function AdminPage() {
                             key={category.value}
                             className="mb-6 p-4 bg-gray-50 rounded-xl"
                           >
-                            <div className="flex items-center justify-between mb-3">
-                              <h4 className="font-semibold text-gray-700">
+                            <div className="flex items-center justify-between flex-wrap mb-3">
+                              <h4 className="font-semibold text-gray-700 flex items-center mb-2 sm:mb-0">
+                                <category.icon className="h-4 w-4 mr-2" />
                                 {category.label}
                               </h4>
-                              <div className="flex items-center space-x-4">
-                                <label className="flex items-center space-x-2 text-sm">
+                              <div className="flex items-center space-x-4 text-xs sm:text-sm">
+                                <label className="flex items-center space-x-2 cursor-pointer">
                                   <input
                                     type="checkbox"
                                     checked={
@@ -1185,11 +1277,11 @@ function AdminPage() {
                                         e.target.checked
                                       )
                                     }
-                                    className="w-3 h-3 text-[#F27F34] bg-gray-100 border-gray-300 rounded focus:ring-[#F27F34]"
+                                    className="w-3 h-3 sm:w-4 sm:h-4 text-[#F27F34] bg-gray-100 border-gray-300 rounded focus:ring-[#F27F34] focus:ring-2"
                                   />
                                   <span>Wajib</span>
                                 </label>
-                                <label className="flex items-center space-x-2 text-sm">
+                                <label className="flex items-center space-x-2 cursor-pointer">
                                   <input
                                     type="checkbox"
                                     checked={
@@ -1203,7 +1295,7 @@ function AdminPage() {
                                         e.target.checked
                                       )
                                     }
-                                    className="w-3 h-3 text-[#F27F34] bg-gray-100 border-gray-300 rounded focus:ring-[#F27F34]"
+                                    className="w-3 h-3 sm:w-4 sm:h-4 text-[#F27F34] bg-gray-100 border-gray-300 rounded focus:ring-[#F27F34] focus:ring-2"
                                   />
                                   <span>Multi Pilih</span>
                                 </label>
@@ -1256,7 +1348,8 @@ function AdminPage() {
                       <div className="space-y-4">
                         {/* Snack */}
                         <div className="p-4 bg-gray-50 rounded-xl">
-                          <h4 className="font-semibold text-gray-700 mb-3">
+                          <h4 className="font-semibold text-gray-700 mb-3 flex items-center">
+                            <Coffee className="h-4 w-4 mr-2" />
                             Snack
                           </h4>
                           <div className="flex flex-wrap gap-2">
@@ -1298,7 +1391,8 @@ function AdminPage() {
 
                         {/* Minuman */}
                         <div className="p-4 bg-gray-50 rounded-xl">
-                          <h4 className="font-semibold text-gray-700 mb-3">
+                          <h4 className="font-semibold text-gray-700 mb-3 flex items-center">
+                            <Utensils className="h-4 w-4 mr-2" />
                             Minuman
                           </h4>
                           <div className="flex flex-wrap gap-2">
@@ -1428,8 +1522,8 @@ function AdminPage() {
 
         {/* Data Display Section */}
         <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center mb-2 sm:mb-0">
               {activeTab === "ingredients" ? (
                 <>
                   <Database className="h-6 w-6 mr-3 text-[#B23501]" />
@@ -1452,7 +1546,7 @@ function AdminPage() {
           {activeTab === "ingredients" ? (
             /* Ingredients Display */
             filteredIngredients.length > 0 ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredIngredients.map((ingredient) => {
                   const categoryInfo = getCategoryInfo(ingredient.category);
                   return (
@@ -1460,52 +1554,49 @@ function AdminPage() {
                       key={ingredient.id}
                       className="group relative overflow-hidden bg-gradient-to-br from-white/50 to-white/30 p-6 rounded-2xl border border-white/20 hover:shadow-lg transition-all duration-300"
                     >
-                      <div className="flex items-start space-x-4">
-                        {/* Image */}
-                        <div className="flex-shrink-0">
-                          {ingredient.image_url ? (
-                            <img
-                              src={ingredient.image_url}
-                              alt={ingredient.name}
-                              className="w-20 h-20 object-cover rounded-xl border border-gray-200 group-hover:scale-105 transition-transform duration-300"
-                              onError={(e) => {
-                                e.target.style.display = "none";
-                                e.target.nextSibling.style.display = "flex";
-                              }}
-                            />
-                          ) : null}
-                          <div
-                            className={`w-20 h-20 bg-gradient-to-r ${
-                              categoryInfo.color
-                            } rounded-xl items-center justify-center ${
-                              ingredient.image_url ? "hidden" : "flex"
-                            }`}
-                          >
-                            <Utensils className="h-8 w-8 text-white" />
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <h3 className="font-bold text-gray-800 text-lg">
-                                {ingredient.name}
-                              </h3>
-                              <div className="flex items-center space-x-2 mb-1">
-                                <span
-                                  className={`px-2 py-1 text-xs font-bold text-white rounded-full bg-gradient-to-r ${categoryInfo.color}`}
-                                >
-                                  {categoryInfo.label}
-                                </span>
-                                <span className="text-sm text-gray-600">
-                                  {ingredient.weight} {ingredient.unit}
-                                </span>
-                              </div>
+                      <div className="flex flex-col space-y-4">
+                        <div className="flex items-start space-x-4">
+                          {/* Image */}
+                          <div className="flex-shrink-0">
+                            {ingredient.image_url ? (
+                              <img
+                                src={ingredient.image_url}
+                                alt={ingredient.name}
+                                className="w-16 h-16 object-cover rounded-xl border border-gray-200 group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                  e.target.nextSibling.style.display = "flex";
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className={`w-16 h-16 bg-gradient-to-r ${
+                                categoryInfo.color
+                              } rounded-xl items-center justify-center ${
+                                ingredient.image_url ? "hidden" : "flex"
+                              }`}
+                            >
+                              {categoryInfo.icon && (
+                                <categoryInfo.icon className="h-6 w-6 text-white" />
+                              )}
                             </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                          </div>
+                          {/* Content */}
+                          <div className="flex-1">
+                            <h3 className="font-bold text-gray-800 text-base sm:text-lg">
+                              {ingredient.name}
+                            </h3>
+                            <div className="flex items-center space-x-2 mb-1 mt-1">
+                              <span
+                                className={`px-2 py-1 text-xs font-bold text-white rounded-full bg-gradient-to-r ${categoryInfo.color}`}
+                              >
+                                {categoryInfo.label}
+                              </span>
+                              <span className="text-sm text-gray-600">
+                                {ingredient.weight} {ingredient.unit}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 mt-2">
                               <button
                                 onClick={() => handleEditIngredient(ingredient)}
                                 className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-md"
@@ -1515,7 +1606,10 @@ function AdminPage() {
                               </button>
                               <button
                                 onClick={() =>
-                                  handleDelete(ingredient.id, "ingredient")
+                                  handleDeletionWithModal(
+                                    ingredient.id,
+                                    "ingredient"
+                                  )
                                 }
                                 className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-md"
                                 title="Hapus bahan"
@@ -1524,30 +1618,32 @@ function AdminPage() {
                               </button>
                             </div>
                           </div>
+                        </div>
 
-                          {/* Description */}
-                          {ingredient.description && (
-                            <p className="text-gray-600 text-sm mb-3 leading-relaxed">
-                              {ingredient.description}
-                            </p>
-                          )}
-
-                          {/* Nutrition Info */}
-                          <div className="grid grid-cols-2 gap-4 text-xs text-gray-600">
-                            <div className="flex items-center space-x-1">
-                              <Flame className="h-3 w-3 text-orange-500" />
-                              <span>{ingredient.calories} kcal</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Activity className="h-3 w-3 text-blue-500" />
-                              <span>{ingredient.protein}g protein</span>
-                            </div>
-                            <div className="text-gray-500">
-                              <span>{ingredient.carbs}g karbo</span>
-                            </div>
-                            <div className="text-gray-500">
-                              <span>{ingredient.fats}g lemak</span>
-                            </div>
+                        {/* Nutrition Info */}
+                        <div className="border-t border-gray-200 pt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-semibold text-gray-700">
+                          <div className="flex items-center space-x-1">
+                            <Flame className="h-3 w-3 text-orange-500" />
+                            <span>{ingredient.calories} kcal</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Activity className="h-3 w-3 text-blue-500" />
+                            <span>
+                              {parseFloat(ingredient.protein).toFixed(1)}g
+                              protein
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Coffee className="h-3 w-3 text-green-500" />
+                            <span>
+                              {parseFloat(ingredient.carbs).toFixed(1)}g karbo
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Tag className="h-3 w-3 text-yellow-500" />
+                            <span>
+                              {parseFloat(ingredient.fats).toFixed(1)}g lemak
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1574,7 +1670,7 @@ function AdminPage() {
             )
           ) : /* Templates Display */
           filteredTemplates.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredTemplates.map((template) => {
                 const typeInfo = getCategoryInfo(template.type, true);
                 return (
@@ -1582,47 +1678,45 @@ function AdminPage() {
                     key={template.id}
                     className="group relative overflow-hidden bg-gradient-to-br from-white/50 to-white/30 p-6 rounded-2xl border border-white/20 hover:shadow-lg transition-all duration-300"
                   >
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
-                        {template.image_url ? (
-                          <img
-                            src={template.image_url}
-                            alt={template.name}
-                            className="w-20 h-20 object-cover rounded-xl border border-gray-200 group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              e.target.style.display = "none";
-                              e.target.nextSibling.style.display = "flex";
-                            }}
-                          />
-                        ) : null}
-                        <div
-                          className={`w-20 h-20 bg-gradient-to-r ${
-                            typeInfo.color
-                          } rounded-xl items-center justify-center ${
-                            template.image_url ? "hidden" : "flex"
-                          }`}
-                        >
-                          <Layers className="h-8 w-8 text-white" />
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="font-bold text-gray-800 text-lg">
-                              {template.name}
-                            </h3>
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span
-                                className={`px-2 py-1 text-xs font-bold text-white rounded-full bg-gradient-to-r ${typeInfo.color}`}
-                              >
-                                {typeInfo.label}
-                              </span>
-                              <span className="text-sm font-bold text-green-600">
-                                Rp {template.basePrice?.toLocaleString("id-ID")}
-                              </span>
-                            </div>
+                    <div className="flex flex-col space-y-4">
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                          {template.image_url ? (
+                            <img
+                              src={template.image_url}
+                              alt={template.name}
+                              className="w-16 h-16 object-cover rounded-xl border border-gray-200 group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                                e.target.nextSibling.style.display = "flex";
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`w-16 h-16 bg-gradient-to-r ${
+                              typeInfo.color
+                            } rounded-xl items-center justify-center ${
+                              template.image_url ? "hidden" : "flex"
+                            }`}
+                          >
+                            <Layers className="h-6 w-6 text-white" />
                           </div>
-                          <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-gray-800 text-base sm:text-lg">
+                            {template.name}
+                          </h3>
+                          <div className="flex flex-wrap items-center space-x-2 mt-1">
+                            <span
+                              className={`px-2 py-1 text-xs font-bold text-white rounded-full bg-gradient-to-r ${typeInfo.color}`}
+                            >
+                              {typeInfo.label}
+                            </span>
+                            <span className="text-sm font-bold text-green-600">
+                              Rp {template.basePrice?.toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 mt-2">
                             <button
                               onClick={() => handleEditTemplate(template)}
                               className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
@@ -1632,7 +1726,7 @@ function AdminPage() {
                             </button>
                             <button
                               onClick={() =>
-                                handleDelete(template.id, "template")
+                                handleDeletionWithModal(template.id, "template")
                               }
                               className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                               title="Hapus template"
@@ -1641,38 +1735,63 @@ function AdminPage() {
                             </button>
                           </div>
                         </div>
-                        {template.description && (
-                          <p className="text-sm text-gray-600 mb-3">
-                            {template.description}
-                          </p>
-                        )}
-                        <div>
-                          <p className="text-xs font-semibold text-gray-600 mb-2">
-                            Komponen:
-                          </p>
-                          <div className="flex flex-wrap gap-1">
-                            {Object.values(template.components || {})
-                              .flatMap((c) => c.options)
-                              .slice(0, 5)
-                              .map((id) => {
-                                const ingredient = getIngredientById(id);
-                                return ingredient ? (
-                                  <span
-                                    key={id}
-                                    className="px-1.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded"
-                                  >
-                                    {ingredient.name}
-                                  </span>
-                                ) : null;
-                              })}
-                            {Object.values(template.components || {}).flatMap(
-                              (c) => c.options
-                            ).length > 5 && (
-                              <span className="text-xs text-gray-400">
-                                +...
-                              </span>
-                            )}
+                      </div>
+                      {/* Nutrition Info - Show only if data exists */}
+                      {(template.calories > 0 ||
+                        template.protein > 0 ||
+                        template.carbs > 0 ||
+                        template.fats > 0) && (
+                        <div className="border-t border-gray-200 pt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-semibold text-gray-700">
+                          <div className="flex items-center space-x-1">
+                            <Flame className="h-3 w-3 text-orange-500" />
+                            <span>{template.calories || 0} kcal</span>
                           </div>
+                          <div className="flex items-center space-x-1">
+                            <Activity className="h-3 w-3 text-blue-500" />
+                            <span>
+                              {parseFloat(template.protein).toFixed(1)}g protein
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Coffee className="h-3 w-3 text-green-500" />
+                            <span>
+                              {parseFloat(template.carbs).toFixed(1)}g karbo
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Tag className="h-3 w-3 text-yellow-500" />
+                            <span>
+                              {parseFloat(template.fats).toFixed(1)}g lemak
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Components List */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 mt-4 mb-2">
+                          Komponen:
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {Object.values(template.components || {})
+                            .flatMap((c) => c.options)
+                            .slice(0, 5)
+                            .map((id) => {
+                              const ingredient = getIngredientById(id);
+                              return ingredient ? (
+                                <span
+                                  key={id}
+                                  className="px-1.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded"
+                                >
+                                  {ingredient.name}
+                                </span>
+                              ) : null;
+                            })}
+                          {Object.values(template.components || {}).flatMap(
+                            (c) => c.options
+                          ).length > 5 && (
+                            <span className="text-xs text-gray-400">+...</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1699,6 +1818,40 @@ function AdminPage() {
           )}
         </section>
       </div>
+      {/* Custom Modal for Confirmation */}
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={closeModal}
+        >
+          <div
+            className="bg-white p-8 rounded-3xl shadow-2xl max-w-md mx-auto text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center mb-4">
+              <AlertCircle className="h-12 w-12 text-red-500" />
+            </div>
+            <h3 className="text-xl font-bold mb-2 text-gray-800">
+              {modalContent.title}
+            </h3>
+            <p className="text-gray-600 mb-6">{modalContent.message}</p>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={handleConfirm}
+                className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-full transition-colors"
+              >
+                {modalContent.confirmText}
+              </button>
+              <button
+                onClick={closeModal}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-full transition-colors"
+              >
+                {modalContent.cancelText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

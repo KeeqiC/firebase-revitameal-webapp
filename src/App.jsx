@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminPage from "./pages/dashboard/AdminPage";
+import AdminPage from './pages/dashboard/AdminPage';
 import ScrollManager from "./utils/ScrollManager";
 
 // Menggunakan React.lazy() untuk memuat halaman secara dinamis

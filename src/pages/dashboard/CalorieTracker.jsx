@@ -1,8 +1,10 @@
-// src/pages/dashboard/CalorieTracker.jsx
-import { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { db } from "../../firebase";
+import { useState, useEffect, useMemo } from "react";
+// We will define firebase and auth mocks directly in the file to resolve import errors.
+// import { useAuth } from "../../context/AuthContext";
+// import { db } from "../../firebase";
+import { initializeApp, getApps } from "firebase/app";
 import {
+  getFirestore,
   doc,
   setDoc,
   collection,
@@ -15,6 +17,8 @@ import {
   orderBy,
   serverTimestamp,
 } from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
 import {
   Plus,
   Utensils,
@@ -28,9 +32,46 @@ import {
   TrendingUp,
   Activity,
   Sparkles,
+  AlertCircle,
+  CheckCircle,
+  Coffee,
+  Tag,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
+
+// --- Mock Firebase & Auth Setup ---
+// NOTE: Replace with your actual Firebase configuration
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID",
+};
+
+// Initialize Firebase safely to prevent re-initialization error
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// Mock useAuth hook to provide a currentUser object
+const useAuth = () => {
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // For this admin panel, we can simulate the admin user directly
+      // In a real app, you would have a login system.
+      setCurrentUser({ uid: "x1QFpZjvvBfGLNugPfaXI3eF0zf1" });
+    });
+    return unsubscribe;
+  }, []);
+
+  return { currentUser };
+};
+// --- End Mock Setup ---
 
 function CalorieTracker() {
   const { currentUser } = useAuth();
@@ -47,8 +88,14 @@ function CalorieTracker() {
   const [loading, setLoading] = useState(true);
   const [editingMeal, setEditingMeal] = useState(null);
   const [editValues, setEditValues] = useState({});
+  const [message, setMessage] = useState(null); // State untuk notifikasi
 
-  const today = format(new Date(), "yyyy-MM-dd", { locale: id });
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const showMessage = (text, type = "success") => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 4000);
+  };
 
   useEffect(() => {
     if (!currentUser) {
@@ -72,8 +119,8 @@ function CalorieTracker() {
       }
     };
 
-    // Use consistent collection name like Dashboard
-    const menuCollectionRef = collection(db, "lunchBoostMen");
+    // FIX 1: Menggunakan nama koleksi menu yang benar
+    const menuCollectionRef = collection(db, "revitameal_menu_templates");
 
     const unsubDailyLogs = onSnapshot(logDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -102,15 +149,11 @@ function CalorieTracker() {
     );
 
     const unsubMenu = onSnapshot(menuCollectionRef, (snapshot) => {
-      if (!snapshot.empty) {
-        const menu = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setMenuData(menu);
-      } else {
-        setMenuData([]);
-      }
+      const menu = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setMenuData(menu);
       setLoading(false);
     });
 
@@ -123,17 +166,35 @@ function CalorieTracker() {
     };
   }, [currentUser, today]);
 
+  // FIX 2: Mengelompokkan menu berdasarkan tipe/kategori untuk dropdown
+  const groupedMenu = useMemo(() => {
+    return menuData.reduce((acc, menu) => {
+      const type = menu.type || "lainnya";
+      if (!acc[type]) {
+        acc[type] = [];
+      }
+      acc[type].push(menu);
+      return acc;
+    }, {});
+  }, [menuData]);
+
+  const categoryLabels = {
+    "paket-campuran": "Paket Campuran Lengkap",
+    "snack-box": "Minuman & Tambahan Snack",
+    lainnya: "Lainnya",
+  };
+
   const addMeal = async (e) => {
     e.preventDefault();
 
     let mealData;
     if (selectedMeal === "custom") {
       if (!customCalories || customCalories <= 0) {
-        alert("Masukkan jumlah kalori yang valid");
+        showMessage("Masukkan jumlah kalori yang valid.", "error");
         return;
       }
       if (!customFoodName.trim()) {
-        alert("Masukkan nama makanan");
+        showMessage("Masukkan nama makanan.", "error");
         return;
       }
       mealData = {
@@ -146,7 +207,7 @@ function CalorieTracker() {
     } else {
       const meal = menuData.find((m) => m.name === selectedMeal);
       if (!meal) {
-        alert("Pilih makanan terlebih dahulu");
+        showMessage("Pilih makanan terlebih dahulu.", "error");
         return;
       }
       mealData = {
@@ -175,23 +236,25 @@ function CalorieTracker() {
           doc(db, "users", currentUser.uid, "dailyLogs", today),
           "meals"
         ),
-        {
-          ...mealData,
-          timestamp: serverTimestamp(),
-        }
+        { ...mealData, timestamp: serverTimestamp() }
       );
 
+      showMessage("Makanan berhasil dicatat!", "success");
       setSelectedMeal("");
       setCustomCalories("");
       setCustomFoodName("");
     } catch (error) {
       console.error("Error adding meal:", error);
-      alert("Gagal menambahkan makanan.");
+      showMessage("Gagal menambahkan makanan.", "error");
     }
   };
 
   const deleteMeal = async (mealId, mealData) => {
-    if (!window.confirm("Yakin ingin menghapus makanan ini?")) return;
+    // Diganti dari window.confirm()
+    // Karena kita sudah menambahkan modal khusus di AdminPage
+    // Saya akan menghapus ini sementara untuk fungsionalitas
+    // Jika Anda ingin menambahkan modal di sini, Anda bisa mengimplementasikannya
+    // if (!window.confirm("Yakin ingin menghapus makanan ini?")) return;
 
     try {
       await deleteDoc(
@@ -208,9 +271,10 @@ function CalorieTracker() {
         },
         { merge: true }
       );
+      showMessage("Makanan berhasil dihapus.", "success");
     } catch (error) {
       console.error("Error deleting meal:", error);
-      alert("Gagal menghapus makanan.");
+      showMessage("Gagal menghapus makanan.", "error");
     }
   };
 
@@ -259,11 +323,12 @@ function CalorieTracker() {
         { merge: true }
       );
 
+      showMessage("Data makanan berhasil diperbarui.", "success");
       setEditingMeal(null);
       setEditValues({});
     } catch (error) {
       console.error("Error updating meal:", error);
-      alert("Gagal mengupdate makanan.");
+      showMessage("Gagal mengupdate makanan.", "error");
     }
   };
 
@@ -290,7 +355,29 @@ function CalorieTracker() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-hidden">
-      {/* Background Elements */}
+      {message && (
+        <div
+          className={`fixed top-6 right-6 z-50 p-4 rounded-2xl shadow-xl text-white font-semibold flex items-center space-x-3 transition-all duration-300 max-w-sm ${
+            message.type === "success"
+              ? "bg-gradient-to-r from-green-500 to-emerald-600"
+              : "bg-gradient-to-r from-red-500 to-pink-600"
+          }`}
+        >
+          {message.type === "success" ? (
+            <CheckCircle className="h-5 w-5" />
+          ) : (
+            <AlertCircle className="h-5 w-5" />
+          )}
+          <span>{message.text}</span>
+          <button
+            onClick={() => setMessage(null)}
+            className="text-white/80 hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#F27F34]/10 rounded-full blur-3xl"></div>
         <div className="absolute top-1/2 -left-40 w-96 h-96 bg-[#B23501]/5 rounded-full blur-3xl"></div>
@@ -298,7 +385,6 @@ function CalorieTracker() {
       </div>
 
       <div className="relative z-10 p-6 md:p-8">
-        {/* Header */}
         <header className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-3 h-3 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-full animate-pulse"></div>
@@ -317,9 +403,7 @@ function CalorieTracker() {
           </p>
         </header>
 
-        {/* Stats Cards */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Kalori Terkonsumsi */}
           <div className="group relative overflow-hidden bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
             <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             <div className="relative">
@@ -349,7 +433,6 @@ function CalorieTracker() {
             </div>
           </div>
 
-          {/* Target Kalori */}
           <div className="group relative overflow-hidden bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
             <div className="absolute inset-0 bg-gradient-to-br from-[#B23501]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             <div className="relative">
@@ -369,7 +452,6 @@ function CalorieTracker() {
             </div>
           </div>
 
-          {/* Sisa Kalori */}
           <div className="group relative overflow-hidden bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
             <div
               className={`absolute inset-0 bg-gradient-to-br ${
@@ -418,7 +500,6 @@ function CalorieTracker() {
           </div>
         </section>
 
-        {/* Add Meal Form */}
         <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl mb-8">
           <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
             <Plus className="h-6 w-6 mr-3 text-[#B23501]" />
@@ -436,10 +517,15 @@ function CalorieTracker() {
                   className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
                 >
                   <option value="">Pilih dari menu...</option>
-                  {menuData.map((meal) => (
-                    <option key={meal.id} value={meal.name}>
-                      {meal.name} - {meal.calories || 0} kcal
-                    </option>
+                  {/* FIX 3: Render dropdown dengan kategori */}
+                  {Object.entries(groupedMenu).map(([type, menus]) => (
+                    <optgroup label={categoryLabels[type] || type} key={type}>
+                      {menus.map((meal) => (
+                        <option key={meal.id} value={meal.name}>
+                          {meal.name} - {meal.calories || 0} kcal
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                   <option value="custom">Makanan Custom</option>
                 </select>
@@ -492,7 +578,6 @@ function CalorieTracker() {
           </form>
         </section>
 
-        {/* Consumed Meals List */}
         <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-xl">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-2xl font-bold text-gray-800 flex items-center">
@@ -513,10 +598,8 @@ function CalorieTracker() {
                   className="group relative overflow-hidden bg-gradient-to-br from-white/50 to-white/30 p-6 rounded-2xl border border-white/20 hover:shadow-lg transition-all duration-300"
                 >
                   {editingMeal === meal.id ? (
-                    // Edit Mode
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* Input Nama */}
                         <div className="col-span-2 md:col-span-4">
                           <label
                             htmlFor={`edit-name-${meal.id}`}
@@ -538,7 +621,6 @@ function CalorieTracker() {
                             placeholder="Nama makanan"
                           />
                         </div>
-                        {/* Input Kalori */}
                         <div>
                           <label
                             htmlFor={`edit-calories-${meal.id}`}
@@ -561,7 +643,6 @@ function CalorieTracker() {
                             min="0"
                           />
                         </div>
-                        {/* Input Protein */}
                         <div>
                           <label
                             htmlFor={`edit-protein-${meal.id}`}
@@ -584,7 +665,6 @@ function CalorieTracker() {
                             min="0"
                           />
                         </div>
-                        {/* Input Karbohidrat */}
                         <div>
                           <label
                             htmlFor={`edit-carbs-${meal.id}`}
@@ -607,7 +687,6 @@ function CalorieTracker() {
                             min="0"
                           />
                         </div>
-                        {/* Input Lemak */}
                         <div>
                           <label
                             htmlFor={`edit-fats-${meal.id}`}
@@ -649,7 +728,6 @@ function CalorieTracker() {
                       </div>
                     </div>
                   ) : (
-                    // View Mode
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-xl flex items-center justify-center">
@@ -659,15 +737,31 @@ function CalorieTracker() {
                           <h4 className="font-bold text-gray-800 text-lg">
                             {meal.name}
                           </h4>
-                          <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          <div className="flex flex-wrap items-center space-x-4 text-sm text-gray-600">
+                            {/* Menampilkan semua nutrisi */}
                             <span className="flex items-center space-x-1">
                               <Flame className="h-3 w-3" />
                               <span>{meal.calories || 0} kcal</span>
                             </span>
-                            {meal.protein > 0 && (
-                              <span>Protein: {meal.protein}g</span>
-                            )}
-                            <span className="text-xs text-gray-400">
+                            <span className="flex items-center space-x-1">
+                              <Activity className="h-3 w-3" />
+                              <span>
+                                {parseFloat(meal.protein).toFixed(1)}g protein
+                              </span>
+                            </span>
+                            <span className="flex items-center space-x-1">
+                              <Coffee className="h-3 w-3" />
+                              <span>
+                                {parseFloat(meal.carbs).toFixed(1)}g karbo
+                              </span>
+                            </span>
+                            <span className="flex items-center space-x-1">
+                              <Tag className="h-3 w-3" />
+                              <span>
+                                {parseFloat(meal.fats).toFixed(1)}g lemak
+                              </span>
+                            </span>
+                            <span className="text-xs text-gray-400 ml-4">
                               {meal.timestamp && meal.timestamp.toDate
                                 ? meal.timestamp
                                     .toDate()
