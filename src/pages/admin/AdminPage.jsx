@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-// We will define firebase and auth mocks directly in the file to resolve import errors.
 // import { useAuth } from "../../context/AuthContext";
 // import { db } from "../../firebase";
 import { initializeApp, getApps } from "firebase/app";
@@ -45,17 +44,6 @@ import {
   Salad,
   Apple,
 } from "lucide-react";
-
-// --- Mock Firebase & Auth Setup ---
-// NOTE: Replace with your actual Firebase configuration
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-};
 
 // Initialize Firebase safely to prevent re-initialization error
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);

@@ -4,8 +4,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminPage from './pages/dashboard/AdminPage';
+import AdminPage from "./pages/admin/AdminPage";
 import ScrollManager from "./utils/ScrollManager";
+import AdminGuide from "./pages/admin/AdminGuide";
 
 // Menggunakan React.lazy() untuk memuat halaman secara dinamis
 const Home = lazy(() => import("./pages/public/Home"));
@@ -41,12 +42,13 @@ function App() {
           </Route>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/admin-guide" element={<AdminGuide />} />
+          <Route path="admin" element={<AdminPage />} />
 
           {/* Rute Terproteksi */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardLayout />}>
               <Route index element={<Dashboard />} />
-              <Route path="admin" element={<AdminPage />} />
               <Route path="lunch-boost" element={<LunchBoost />} />
               <Route path="calorie-tracker" element={<CalorieTracker />} />
               <Route path="diet-planner" element={<DietPlanner />} />
