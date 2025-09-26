@@ -13,7 +13,6 @@ import {
   orderBy,
   serverTimestamp,
 } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 import {
   Edit,
@@ -36,28 +35,14 @@ import {
   Video,
 } from "lucide-react";
 
+// NOTE: Pastikan firebaseConfig sudah di-import atau didefinisikan di atas file ini.
+// Contoh: import { firebaseConfig } from '../../firebase-config';
+
 // Initialize Firebase safely
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
-
-// Mock useAuth hook
-const useAuth = () => {
-  const [currentUser, setCurrentUser] = useState(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser({ uid: "x1QFpZjvvBfGLNugPfaXI3eF0zf1" });
-    });
-    return unsubscribe;
-  }, []);
-
-  return { currentUser };
-};
 
 function AdminGuide() {
-  const { currentUser } = useAuth();
-
   // State for fitness video form
   const [videoData, setVideoData] = useState({
     title: "",
@@ -79,8 +64,6 @@ function AdminGuide() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
 
-  const adminUid = "x1QFpZjvvBfGLNugPfaXI3eF0zf1";
-
   // Video categories
   const videoCategories = [
     { value: "cardio", label: "Kardio" },
@@ -99,9 +82,7 @@ function AdminGuide() {
   ];
 
   useEffect(() => {
-    if (currentUser?.uid !== adminUid) return;
-
-    // Load fitness videos from Firestore
+    // Load fitness videos from Firestore on component mount
     const videosQuery = query(
       collection(db, "revitameal_fitness_videos"),
       orderBy("createdAt", "desc")
@@ -117,7 +98,7 @@ function AdminGuide() {
     });
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, []); // Dependency array is empty to run only once
 
   // Filter functionality
   useEffect(() => {
@@ -250,24 +231,6 @@ function AdminGuide() {
     };
     return colors[level] || "bg-gray-100 text-gray-800";
   };
-
-  if (currentUser?.uid !== adminUid) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-500/10 via-pink-500/10 to-red-600/20 flex justify-center items-center">
-        <div className="text-center bg-white/80 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-2xl max-w-md">
-          <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Akses Ditolak
-          </h1>
-          <p className="text-gray-600">
-            Hanya admin yang dapat mengakses halaman ini.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-hidden">

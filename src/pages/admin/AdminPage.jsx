@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-// import { useAuth } from "../../context/AuthContext";
-// import { db } from "../../firebase";
 import { initializeApp, getApps } from "firebase/app";
 import {
   getFirestore,
@@ -13,7 +11,6 @@ import {
   deleteDoc,
   orderBy,
 } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 import {
   Edit,
@@ -45,31 +42,14 @@ import {
   Apple,
 } from "lucide-react";
 
+// NOTE: Pastikan firebaseConfig sudah di-import atau didefinisikan di atas file ini.
+// Contoh: import { firebaseConfig } from '../../firebase-config';
+
 // Initialize Firebase safely to prevent re-initialization error
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
-
-// Mock useAuth hook to provide a currentUser object
-const useAuth = () => {
-  const [currentUser, setCurrentUser] = useState(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // For this admin panel, we can simulate the admin user directly
-      // In a real app, you would have a login system.
-      setCurrentUser({ uid: "x1QFpZjvvBfGLNugPfaXI3eF0zf1" });
-    });
-    return unsubscribe;
-  }, []);
-
-  return { currentUser };
-};
-// --- End Mock Setup ---
 
 function AdminPage() {
-  const { currentUser } = useAuth();
-
   // State for Ingredient Database
   const [ingredient, setIngredient] = useState({
     name: "",
@@ -115,8 +95,6 @@ function AdminPage() {
   const [activeTab, setActiveTab] = useState("ingredients"); // ingredients, templates
   const [showForm, setShowForm] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
-
-  const adminUid = "x1QFpZjvvBfGLNugPfaXI3eF0zf1";
 
   // Categories for Ingredient Database
   const ingredientCategories = [
@@ -181,8 +159,6 @@ function AdminPage() {
   const unitOptions = ["gr", "ml", "buah", "potong", "sendok"];
 
   useEffect(() => {
-    if (currentUser?.uid !== adminUid) return;
-
     // Load Ingredient Database
     const ingredientsQuery = query(
       collection(db, "revitameal_ingredients"),
@@ -215,7 +191,7 @@ function AdminPage() {
       unsubscribeIngredients();
       unsubscribeTemplates();
     };
-  }, [currentUser]);
+  }, []); // Empty dependency array to run only once
 
   // Filter functionality
   useEffect(() => {
@@ -580,24 +556,6 @@ function AdminPage() {
       () => handleDelete(id, type)
     );
   };
-
-  if (currentUser?.uid !== adminUid) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-500/10 via-pink-500/10 to-red-600/20 flex justify-center items-center">
-        <div className="text-center bg-white/80 backdrop-blur-xl border border-white/30 p-8 rounded-3xl shadow-2xl max-w-md">
-          <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            Akses Ditolak
-          </h1>
-          <p className="text-gray-600">
-            Hanya admin yang dapat mengakses halaman ini.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-x-hidden p-4 sm:p-6 md:p-8 lg:p-12">

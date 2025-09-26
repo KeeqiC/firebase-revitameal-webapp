@@ -1,5 +1,8 @@
+// src/components/ChiboAssistant.jsx
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Sparkles, MessageCircle } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const CHIBO_API_URL = "https://revitameal-api2.vercel.app/api/chibo";
 
@@ -8,7 +11,7 @@ function ChiboAssistant() {
     {
       id: 1,
       sender: "chibo",
-      text: "Halo! Saya Chibo, asisten nutrisi pribadi Anda. Saya siap membantu Anda dengan pertanyaan seputar nutrisi, diet sehat, dan gaya hidup aktif. Ada yang bisa saya bantu hari ini?",
+      text: "Halo! Saya **Chibo**, asisten nutrisi pribadi Anda. ✨\n\nSaya siap membantu Anda dengan pertanyaan seputar *nutrisi*, diet sehat, dan gaya hidup aktif.\n\nAda yang bisa saya bantu hari ini?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -16,7 +19,7 @@ function ChiboAssistant() {
   const messagesEndRef = useRef(null);
 
   const handleSendMessage = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (input.trim() === "" || loading) return;
 
     const userMessage = input.trim();
@@ -64,7 +67,7 @@ function ChiboAssistant() {
         {
           id: Date.now() + 1,
           sender: "chibo",
-          text: "Maaf, terjadi kesalahan saat menghubungi server. Silakan coba lagi dalam beberapa saat.",
+          text: "❌ Maaf, terjadi kesalahan saat menghubungi server. Silakan coba lagi dalam beberapa saat.",
         },
       ]);
     } finally {
@@ -105,7 +108,7 @@ function ChiboAssistant() {
       </div>
 
       <div className="relative z-10 h-screen flex flex-col p-6 md:p-8">
-        {/* Enhanced Header - consistent with other pages */}
+        {/* Header */}
         <header className="mb-6">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-3 h-3 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-full animate-pulse"></div>
@@ -156,9 +159,19 @@ function ChiboAssistant() {
                       : "bg-white/80 text-gray-800 rounded-bl-md border border-white/30"
                   }`}
                 >
-                  <p className="text-sm md:text-base leading-relaxed whitespace-pre-wrap">
-                    {msg.text}
-                  </p>
+                  {/* Wrap ReactMarkdown inside a div (do NOT pass className to ReactMarkdown) */}
+                  <div
+                    className={`prose prose-sm md:prose-base max-w-none ${
+                      msg.sender === "user"
+                        ? "prose-invert text-white"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.text}
+                    </ReactMarkdown>
+                  </div>
+
                   {msg.sender === "chibo" && (
                     <Sparkles className="absolute -top-2 -right-2 h-4 w-4 text-cyan-500" />
                   )}
@@ -181,10 +194,7 @@ function ChiboAssistant() {
                 <div className="bg-white/80 text-gray-800 p-4 rounded-2xl rounded-bl-md border border-white/30 shadow-lg">
                   <div className="flex items-center space-x-2">
                     <div className="flex space-x-1">
-                      <div
-                        className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      ></div>
+                      <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"></div>
                       <div
                         className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"
                         style={{ animationDelay: "150ms" }}
