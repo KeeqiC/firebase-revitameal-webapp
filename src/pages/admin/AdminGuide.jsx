@@ -1,8 +1,9 @@
 // src/pages/admin/AdminGuide.jsx
 import { useState, useEffect } from "react";
-import { initializeApp, getApps } from "firebase/app";
+// Impor db dari file pusat Firebase
+import { db } from "../../firebase"; // Pastikan path ini benar sesuai struktur proyek Anda
+
 import {
-  getFirestore,
   collection,
   addDoc,
   query,
@@ -34,13 +35,6 @@ import {
   Database,
   Video,
 } from "lucide-react";
-
-// NOTE: Pastikan firebaseConfig sudah di-import atau didefinisikan di atas file ini.
-// Contoh: import { firebaseConfig } from '../../firebase-config';
-
-// Initialize Firebase safely
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
 function AdminGuide() {
   // State for fitness video form
@@ -82,7 +76,7 @@ function AdminGuide() {
   ];
 
   useEffect(() => {
-    // Load fitness videos from Firestore on component mount
+    // Load fitness videos from Firestore
     const videosQuery = query(
       collection(db, "revitameal_fitness_videos"),
       orderBy("createdAt", "desc")
@@ -98,7 +92,7 @@ function AdminGuide() {
     });
 
     return () => unsubscribe();
-  }, []); // Dependency array is empty to run only once
+  }, []); // Dependency array kosong
 
   // Filter functionality
   useEffect(() => {

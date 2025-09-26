@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { initializeApp, getApps } from "firebase/app";
+// Impor db dari file pusat Firebase
+import { db } from "../../firebase"; // Pastikan path ini benar sesuai struktur proyek Anda
+
 import {
-  getFirestore,
   collection,
   addDoc,
   query,
@@ -41,13 +42,6 @@ import {
   Salad,
   Apple,
 } from "lucide-react";
-
-// NOTE: Pastikan firebaseConfig sudah di-import atau didefinisikan di atas file ini.
-// Contoh: import { firebaseConfig } from '../../firebase-config';
-
-// Initialize Firebase safely to prevent re-initialization error
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
 function AdminPage() {
   // State for Ingredient Database
@@ -191,7 +185,7 @@ function AdminPage() {
       unsubscribeIngredients();
       unsubscribeTemplates();
     };
-  }, []); // Empty dependency array to run only once
+  }, []); // Dependency array kosong
 
   // Filter functionality
   useEffect(() => {
@@ -912,6 +906,7 @@ function AdminPage() {
                         onChange={handleIngredientChange}
                         className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
                         placeholder="0.6"
+                        required
                       />
                     </div>
                   </div>
