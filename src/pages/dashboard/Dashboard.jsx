@@ -1,4 +1,3 @@
-// src/pages/dashboard/Dashboard.jsx
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -17,9 +16,35 @@ import {
   Activity,
 } from "lucide-react";
 import { doc, onSnapshot, collection } from "firebase/firestore";
-import { useAuth } from "../../context/AuthContext";
-import { db } from "../../firebase";
 import { format } from "date-fns";
+import { initializeApp, getApps } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
+// Initialize Firebase
+const app =
+  getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// Mock Auth Context
+const useAuth = () => {
+  const [currentUser, setCurrentUser] = useState(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // For demonstration, we'll mock a user if none is logged in.
+      // In a real app, you might handle this differently.
+      if (user) {
+        setCurrentUser(user);
+      } else {
+        // Mock user for development purposes
+        setCurrentUser({ uid: "x1QFpZjvvBfGLNugPfaXI3eF0zf1", isMock: true });
+      }
+    });
+    return unsubscribe;
+  }, []);
+  return { currentUser };
+};
 
 function Dashboard() {
   const { currentUser } = useAuth();
@@ -44,36 +69,50 @@ function Dashboard() {
       "dailyLogs",
       today
     );
-    const menuCollectionRef = collection(db, "lunchBoostMen");
+    const menuCollectionRef = collection(db, "revitameal_menu_templates");
 
-    const unsubProfile = onSnapshot(profileDocRef, (docSnap) => {
-      setProfile(docSnap.exists() ? docSnap.data() : null);
-    });
+    let unsubProfile, unsubDailyLog, unsubMenu;
 
-    const unsubDailyLog = onSnapshot(dailyLogDocRef, (docSnap) => {
-      setTotalCalories(
-        docSnap.exists() ? docSnap.data().totalCalories || 0 : 0
+    // Set a timeout to ensure onSnapshot doesn't run before loading is potentially complete
+    const timer = setTimeout(() => {
+      unsubProfile = onSnapshot(
+        profileDocRef,
+        (docSnap) => {
+          setProfile(docSnap.exists() ? docSnap.data() : null);
+        },
+        () => setLoading(false)
       );
-    });
 
-    const unsubMenu = onSnapshot(menuCollectionRef, (snapshot) => {
-      if (!snapshot.empty) {
-        const menu = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        const randomIndex = Math.floor(Math.random() * menu.length);
-        setRecommendedMenu(menu[randomIndex]);
-      } else {
-        setRecommendedMenu(null);
-      }
-      setLoading(false);
-    });
+      unsubDailyLog = onSnapshot(dailyLogDocRef, (docSnap) => {
+        setTotalCalories(
+          docSnap.exists() ? docSnap.data().totalCalories || 0 : 0
+        );
+      });
+
+      unsubMenu = onSnapshot(
+        menuCollectionRef,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const menu = snapshot.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }));
+            const randomIndex = Math.floor(Math.random() * menu.length);
+            setRecommendedMenu(menu[randomIndex]);
+          } else {
+            setRecommendedMenu(null);
+          }
+          setLoading(false);
+        },
+        () => setLoading(false)
+      );
+    }, 100);
 
     return () => {
-      unsubProfile();
-      unsubDailyLog();
-      unsubMenu();
+      clearTimeout(timer);
+      if (unsubProfile) unsubProfile();
+      if (unsubDailyLog) unsubDailyLog();
+      if (unsubMenu) unsubMenu();
     };
   }, [currentUser]);
 

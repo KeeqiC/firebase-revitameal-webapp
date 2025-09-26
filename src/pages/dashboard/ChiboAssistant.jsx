@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Sparkles, MessageCircle } from "lucide-react";
 
-const CHIBO_API_URL = "https://revitameal-chibo-api.vercel.app/api/chibo";
+const CHIBO_API_URL = "https://revitameal-api2.vercel.app/api/chibo";
 
 function ChiboAssistant() {
   const [messages, setMessages] = useState([

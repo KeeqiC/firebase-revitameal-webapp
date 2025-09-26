@@ -43,7 +43,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/admin-guide" element={<AdminGuide />} />
-          <Route path="admin" element={<AdminPage />} />
+          <Route path="/admin" element={<AdminPage />} />
 
           {/* Rute Terproteksi */}
           <Route element={<ProtectedRoute />}>
