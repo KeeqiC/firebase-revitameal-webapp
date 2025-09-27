@@ -11,6 +11,8 @@ import {
   query,
   onSnapshot,
   getDoc,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -39,6 +41,16 @@ import {
   Heart,
   Flame,
   Tag,
+  Brain,
+  Shield,
+  Lightbulb,
+  Award,
+  Info,
+  Star,
+  Filter,
+  Calculator,
+  Utensils,
+  Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
@@ -73,12 +85,109 @@ function DietPlanner() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [message, setMessage] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [alternativeAdvice, setAlternativeAdvice] = useState(null);
+  const [consumedMeals, setConsumedMeals] = useState([]);
+  const [dailyTotals, setDailyTotals] = useState({
+    totalCalories: 0,
+    totalProtein: 0,
+    totalCarbs: 0,
+    totalFats: 0,
+  });
 
   const today = format(new Date(), "yyyy-MM-dd");
 
   const showMessage = (text, type = "success") => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 5000);
+  };
+
+  // Smart filtering logic based on diet goals
+  const getSmartRecommendations = (menus, goal) => {
+    let filtered = [];
+    let advice = null;
+
+    switch (goal) {
+      case "Menurunkan Berat Badan":
+        filtered = menus.filter((menu) => menu.calories && menu.calories < 400);
+        if (filtered.length < 3) {
+          advice = {
+            title: "Tips Menurunkan Berat Badan",
+            content:
+              "Menu rendah kalori terbatas dalam database. Fokus pada makanan tinggi serat seperti sayuran hijau, buah-buahan, protein tanpa lemak seperti ayam tanpa kulit, ikan, dan biji-bijian utuh. Hindari makanan olahan dan minuman manis.",
+            tips: [
+              "Makan dalam porsi kecil tapi sering (5-6x sehari)",
+              "Perbanyak konsumsi air putih minimal 2-3 liter/hari",
+              "Kombinasikan dengan olahraga kardio 150 menit/minggu",
+              "Tidur cukup 7-8 jam untuk mengatur hormon lapar",
+            ],
+          };
+        }
+        break;
+
+      case "Menambah Massa Otot":
+        filtered = menus.filter((menu) => menu.protein && menu.protein > 20);
+        if (filtered.length < 3) {
+          advice = {
+            title: "Tips Menambah Massa Otot",
+            content:
+              "Menu tinggi protein terbatas. Prioritaskan makanan kaya protein seperti telur, daging tanpa lemak, ikan salmon, tuna, susu, yogurt Greek, kacang-kacangan, dan quinoa. Kombinasikan dengan latihan beban yang teratur.",
+            tips: [
+              "Konsumsi 1.6-2.2g protein per kg berat badan",
+              "Makan protein dalam 30 menit setelah latihan",
+              "Gabungkan protein hewani dan nabati",
+              "Latihan beban 3-4x seminggu untuk stimulus otot",
+            ],
+          };
+        }
+        break;
+
+      case "Mempertahankan Berat Badan":
+        filtered = menus.filter(
+          (menu) => menu.calories >= 350 && menu.calories <= 500
+        );
+        if (filtered.length < 3) {
+          advice = {
+            title: "Tips Mempertahankan Berat Badan",
+            content:
+              "Menu seimbang terbatas. Fokus pada kombinasi yang tepat antara karbohidrat kompleks, protein berkualitas, dan lemak sehat. Pastikan asupan kalori sesuai dengan kebutuhan harian Anda.",
+            tips: [
+              "Konsumsi makanan seimbang dengan porsi 1/2 piring sayur, 1/4 protein, 1/4 karbo",
+              "Makan teratur 3 kali sehari dengan 2 snack sehat",
+              "Monitor berat badan mingguan, bukan harian",
+              "Tetap aktif dengan olahraga ringan seperti jalan kaki",
+            ],
+          };
+        }
+        break;
+
+      case "Gaya Hidup Sehat":
+      default:
+        filtered = menus.filter(
+          (menu) =>
+            menu.calories &&
+            menu.calories >= 300 &&
+            menu.calories <= 600 &&
+            menu.protein &&
+            menu.protein >= 10
+        );
+        if (filtered.length < 3) {
+          advice = {
+            title: "Tips Gaya Hidup Sehat",
+            content:
+              "Menu sehat seimbang terbatas. Fokus pada variasi makanan alami, warna-warni dalam piring, dan hindari makanan ultra-proses. Prioritaskan makanan segar dan lokal.",
+            tips: [
+              "Terapkan pola makan 'Rainbow Plate' - beragam warna sayur dan buah",
+              "Batasi gula tambahan maksimal 6 sendok teh/hari",
+              "Pilih whole grains daripada refined grains",
+              "Masak sendiri minimal 5x seminggu untuk kontrol kualitas",
+            ],
+          };
+        }
+        break;
+    }
+
+    return { filtered, advice };
   };
 
   useEffect(() => {
@@ -101,6 +210,7 @@ function DietPlanner() {
       }
     };
 
+    // Listen to menu data
     const menuCollectionRef = collection(db, "revitameal_menu_templates");
     const unsubMenu = onSnapshot(menuCollectionRef, (snapshot) => {
       const menu = snapshot.docs.map((doc) => ({
@@ -108,8 +218,16 @@ function DietPlanner() {
         ...doc.data(),
       }));
       setMenuData(menu);
+
+      // Generate smart recommendations when menu data changes
+      if (menu.length > 0) {
+        const { filtered, advice } = getSmartRecommendations(menu, dietGoal);
+        setRecommendations(filtered);
+        setAlternativeAdvice(advice);
+      }
     });
 
+    // Listen to diet plan
     const planDocRef = doc(db, "users", currentUser.uid, "dietPlans", today);
     const unsubPlan = onSnapshot(planDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -120,57 +238,125 @@ function DietPlanner() {
       setLoading(false);
     });
 
+    // Listen to consumed meals from calorie tracker
+    const logDocRef = doc(db, "users", currentUser.uid, "dailyLogs", today);
+    const mealsCollectionRef = collection(logDocRef, "meals");
+
+    const unsubConsumedMeals = onSnapshot(mealsCollectionRef, (snapshot) => {
+      const meals = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setConsumedMeals(meals);
+    });
+
+    // Listen to daily totals
+    const unsubDailyTotals = onSnapshot(logDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setDailyTotals({
+          totalCalories: data.totalCalories || 0,
+          totalProtein: data.totalProtein || 0,
+          totalCarbs: data.totalCarbs || 0,
+          totalFats: data.totalFats || 0,
+        });
+      } else {
+        setDailyTotals({
+          totalCalories: 0,
+          totalProtein: 0,
+          totalCarbs: 0,
+          totalFats: 0,
+        });
+      }
+    });
+
     fetchUserProfile();
 
     return () => {
       unsubMenu();
       unsubPlan();
+      unsubConsumedMeals();
+      unsubDailyTotals();
     };
   }, [currentUser, today]);
 
-  const generateAndSavePlan = async () => {
+  // Function to consume meal from diet plan
+  const consumeMealFromPlan = async (meal, mealType) => {
+    if (!currentUser) return;
+
+    try {
+      // Add meal to calorie tracker
+      const logDocRef = doc(db, "users", currentUser.uid, "dailyLogs", today);
+      const mealsCollectionRef = collection(logDocRef, "meals");
+
+      const mealData = {
+        name: meal.name,
+        calories: meal.calories || 0,
+        protein: meal.protein || 0,
+        carbs: meal.carbs || 0,
+        fats: meal.fats || 0,
+        fromDietPlan: true,
+        mealType: mealType,
+        timestamp: serverTimestamp(),
+      };
+
+      // Add to meals collection
+      await addDoc(mealsCollectionRef, mealData);
+
+      // Update daily totals
+      await setDoc(
+        logDocRef,
+        {
+          totalCalories: dailyTotals.totalCalories + mealData.calories,
+          totalProtein: dailyTotals.totalProtein + mealData.protein,
+          totalCarbs: dailyTotals.totalCarbs + mealData.carbs,
+          totalFats: dailyTotals.totalFats + mealData.fats,
+        },
+        { merge: true }
+      );
+
+      showMessage(
+        `${meal.name} telah ditambahkan ke tracker kalori!`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Error consuming meal:", error);
+      showMessage("Gagal menambahkan makanan ke tracker.", "error");
+    }
+  };
+
+  // Check if meal from plan is already consumed
+  const isMealConsumed = (planMeal, mealType) => {
+    return consumedMeals.some(
+      (consumed) =>
+        consumed.fromDietPlan &&
+        consumed.mealType === mealType &&
+        consumed.name === planMeal.name
+    );
+  };
+
+  // Update recommendations when diet goal changes
+  useEffect(() => {
+    if (menuData.length > 0) {
+      const { filtered, advice } = getSmartRecommendations(menuData, dietGoal);
+      setRecommendations(filtered);
+      setAlternativeAdvice(advice);
+    }
+  }, [dietGoal, menuData]);
+
+  const generateSmartPlan = async () => {
     const validMenus = menuData.filter((m) => m.name && m.calories);
 
     if (validMenus.length < 3) {
-      showMessage("Menu tidak cukup untuk membuat rencana lengkap.", "error");
+      showMessage(
+        "Database menu belum mencukupi untuk membuat rencana.",
+        "error"
+      );
       return;
     }
 
-    let menuPool = [...validMenus];
-    let attemptedFilter = false;
-
-    let filteredMenus = [...validMenus];
-    switch (dietGoal) {
-      case "Menurunkan Berat Badan":
-        filteredMenus = validMenus.filter((menu) => menu.calories < 450);
-        attemptedFilter = true;
-        break;
-      case "Menambah Massa Otot":
-        filteredMenus = validMenus.filter(
-          (menu) => menu.protein && menu.protein > 25
-        );
-        attemptedFilter = true;
-        break;
-      case "Mempertahankan Berat Badan":
-        filteredMenus = validMenus.filter(
-          (menu) => menu.calories >= 400 && menu.calories <= 600
-        );
-        attemptedFilter = true;
-        break;
-      case "Gaya Hidup Sehat":
-      default:
-        break;
-    }
-
-    if (attemptedFilter && filteredMenus.length < 3) {
-      showMessage(
-        `Menu untuk "${dietGoal}" terbatas. Rencana dibuat dari menu umum.`,
-        "info"
-      );
-    } else {
-      menuPool = filteredMenus;
-    }
-
+    // Use smart recommendations if available, otherwise use all valid menus
+    const menuPool = recommendations.length >= 3 ? recommendations : validMenus;
     const shuffledMenus = menuPool.sort(() => 0.5 - Math.random());
 
     const plan = {
@@ -183,8 +369,10 @@ function DietPlanner() {
       totalProtein: 0,
       totalCarbs: 0,
       totalFats: 0,
+      isSmartGenerated: recommendations.length >= 3,
     };
 
+    // Calculate totals
     plan.totalCalories =
       (plan.breakfast.calories || 0) +
       (plan.lunch.calories || 0) +
@@ -208,7 +396,12 @@ function DietPlanner() {
     try {
       const planDocRef = doc(db, "users", currentUser.uid, "dietPlans", today);
       await setDoc(planDocRef, plan);
-      showMessage("Rencana diet berhasil dibuat!", "success");
+
+      const successMessage = plan.isSmartGenerated
+        ? "Rencana diet cerdas berhasil dibuat sesuai tujuan Anda!"
+        : "Rencana diet umum berhasil dibuat!";
+
+      showMessage(successMessage, "success");
     } catch (error) {
       console.error("Error saving diet plan:", error);
       showMessage("Gagal menyimpan rencana diet.", "error");
@@ -262,11 +455,19 @@ function DietPlanner() {
     }
   };
 
-  const dietGoalIcons = {
-    "Menurunkan Berat Badan": TrendingUp,
-    "Menambah Massa Otot": Zap,
-    "Mempertahankan Berat Badan": Target,
-    "Gaya Hidup Sehat": Heart,
+  const getDietGoalIcon = (goal) => {
+    switch (goal) {
+      case "Menurunkan Berat Badan":
+        return TrendingUp;
+      case "Menambah Massa Otot":
+        return Zap;
+      case "Mempertahankan Berat Badan":
+        return Target;
+      case "Gaya Hidup Sehat":
+        return Heart;
+      default:
+        return Target;
+    }
   };
 
   if (loading) {
@@ -275,12 +476,14 @@ function DietPlanner() {
         <div className="text-center">
           <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-[#F27F34] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-lg sm:text-xl text-gray-600 font-medium">
-            Memuat rencana diet...
+            Menganalisis profil diet Anda...
           </p>
         </div>
       </div>
     );
   }
+
+  const GoalIcon = getDietGoalIcon(dietGoal);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-hidden">
@@ -323,73 +526,176 @@ function DietPlanner() {
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-3 h-3 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-full animate-pulse"></div>
             <span className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-              Diet Planning
+              Smart Diet Assistant
             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-800 mb-2">
             <span className="bg-gradient-to-r from-[#F27F34] to-[#B23501] bg-clip-text text-transparent">
-              Rencana
+              Diet
             </span>{" "}
-            Diet
+            Planner
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl">
-            Susun rencana makan sehat untuk mencapai tujuan diet Anda
+            Rekomendasi menu personal berdasarkan tujuan diet dan profil
+            kesehatan Anda
           </p>
         </header>
 
-        {/* Diet Goal Section */}
+        {/* Smart Analysis Section */}
         <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-4 sm:p-6 lg:p-8 rounded-3xl shadow-xl mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-[#F27F34] to-[#B23501] rounded-2xl flex items-center justify-center shadow-lg">
-                <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                <Brain className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
               <div>
                 <h2 className="text-lg sm:text-2xl font-bold text-gray-800">
-                  Tujuan Diet Anda
+                  Analisis Cerdas
                 </h2>
-                <p className="text-sm sm:text-lg text-gray-600">{dietGoal}</p>
+                <p className="text-sm sm:text-lg text-gray-600 flex items-center">
+                  <GoalIcon className="h-4 w-4 mr-2" />
+                  {dietGoal}
+                </p>
               </div>
             </div>
-            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-[#B23501] self-center sm:self-auto" />
+            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-[#B23501]" />
           </div>
 
-          <div className="bg-gradient-to-br from-[#F27F34]/5 to-[#B23501]/10 p-4 sm:p-6 rounded-2xl border border-white/20 mb-6">
-            <div className="flex items-center space-x-3 mb-3 sm:mb-4">
-              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-[#B23501]" />
-              <p className="text-gray-700 font-medium text-sm sm:text-base">
-                Rencana Personal Anda
-              </p>
+          {/* Smart Recommendations Display */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Menu Analysis */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 sm:p-6 rounded-2xl border border-blue-200">
+              <div className="flex items-center space-x-3 mb-4">
+                <Filter className="h-5 w-5 text-blue-600" />
+                <h3 className="font-bold text-gray-800">Analisis Menu</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    Total menu dalam database:
+                  </span>
+                  <span className="font-bold text-gray-800">
+                    {menuData.length} menu
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    Menu yang sesuai tujuan:
+                  </span>
+                  <span className="font-bold text-blue-600">
+                    {recommendations.length} menu
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    Tingkat kesesuaian:
+                  </span>
+                  <span
+                    className={`font-bold ${
+                      recommendations.length >= 3
+                        ? "text-green-600"
+                        : "text-orange-600"
+                    }`}
+                  >
+                    {recommendations.length >= 3 ? "Optimal" : "Terbatas"}
+                  </span>
+                </div>
+              </div>
             </div>
-            <p className="text-gray-600 leading-relaxed mb-4 text-sm sm:text-base">
-              Sistem akan membuat rencana makan harian yang disesuaikan dengan
-              tujuan diet Anda. Menu dipilih secara acak dari koleksi makanan
-              sehat yang tersedia.
-            </p>
+
+            {/* Profile Summary */}
             {profile && (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-xs sm:text-sm text-gray-500">
-                <span>Target: {profile.dailyCalories || 2000} kcal/hari</span>
-                <span className="hidden sm:inline">•</span>
-                <span>Berat: {profile.currentWeight || "-"} kg</span>
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 sm:p-6 rounded-2xl border border-green-200">
+                <div className="flex items-center space-x-3 mb-4">
+                  <Calculator className="h-5 w-5 text-green-600" />
+                  <h3 className="font-bold text-gray-800">Profil Nutrisi</h3>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      Target kalori harian:
+                    </span>
+                    <span className="font-bold text-gray-800">
+                      {profile.dailyCalories || 2000} kcal
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      Berat badan saat ini:
+                    </span>
+                    <span className="font-bold text-gray-800">
+                      {profile.currentWeight || "-"} kg
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      Target berat badan:
+                    </span>
+                    <span className="font-bold text-green-600">
+                      {profile.targetWeight || "-"} kg
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          <button
-            onClick={generateAndSavePlan}
-            disabled={!!dietPlan}
-            className="group relative overflow-hidden bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 flex items-center space-x-2 sm:space-x-3 w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 text-sm sm:text-base"
-          >
-            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
-            <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5 relative z-10" />
-            <span className="relative z-10">
-              {dietPlan
-                ? "Rencana Hari Ini Sudah Dibuat"
-                : "Buat Rencana Harian"}
-            </span>
-            <ChefHat className="h-4 w-4 sm:h-5 sm:w-5 relative z-10" />
-          </button>
+          {/* Action Button */}
+          <div className="text-center">
+            <button
+              onClick={generateSmartPlan}
+              disabled={!!dietPlan}
+              className="group relative overflow-hidden bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 flex items-center space-x-2 sm:space-x-3 mx-auto disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 text-sm sm:text-base"
+            >
+              <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+              <Brain className="h-4 w-4 sm:h-5 sm:w-5 relative z-10" />
+              <span className="relative z-10">
+                {dietPlan
+                  ? "Rencana Hari Ini Sudah Dibuat"
+                  : recommendations.length >= 3
+                  ? "Generate Rencana Cerdas"
+                  : "Generate Rencana Umum"}
+              </span>
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 relative z-10" />
+            </button>
+          </div>
         </section>
+
+        {/* Alternative Advice Section */}
+        {alternativeAdvice && recommendations.length < 3 && (
+          <section className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-4 sm:p-6 lg:p-8 rounded-3xl shadow-xl mb-6 sm:mb-8">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center">
+                <Lightbulb className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800">
+                {alternativeAdvice.title}
+              </h3>
+            </div>
+
+            <p className="text-gray-700 mb-4 leading-relaxed text-sm sm:text-base">
+              {alternativeAdvice.content}
+            </p>
+
+            <div className="bg-white/50 p-4 rounded-2xl">
+              <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+                <Award className="h-4 w-4 mr-2 text-orange-600" />
+                Rekomendasi Praktis:
+              </h4>
+              <ul className="space-y-2">
+                {alternativeAdvice.tips.map((tip, index) => (
+                  <li
+                    key={index}
+                    className="flex items-start space-x-2 text-sm sm:text-base"
+                  >
+                    <Star className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
 
         {/* Diet Plan Display */}
         <section className="bg-white/70 backdrop-blur-xl border border-white/30 p-4 sm:p-6 lg:p-8 rounded-3xl shadow-xl">
@@ -398,14 +704,22 @@ function DietPlanner() {
               <Calendar className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 text-[#B23501]" />
               Rencana Diet Hari Ini
             </h2>
-            <span className="text-xs sm:text-sm text-gray-500 bg-white/50 px-2 sm:px-3 py-1 rounded-full">
-              {format(new Date(), "d MMM yyyy", { locale: id })}
-            </span>
+            <div className="flex items-center space-x-2">
+              {dietPlan?.isSmartGenerated && (
+                <div className="flex items-center space-x-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
+                  <Brain className="h-3 w-3" />
+                  <span>Cerdas</span>
+                </div>
+              )}
+              <span className="text-xs sm:text-sm text-gray-500 bg-white/50 px-2 sm:px-3 py-1 rounded-full">
+                {format(new Date(), "d MMM yyyy", { locale: id })}
+              </span>
+            </div>
           </div>
 
           {dietPlan ? (
             <div className="space-y-4 sm:space-y-6">
-              {/* Total Calories Card */}
+              {/* Total Calories Card - Integrated with CalorieTracker */}
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 sm:p-6 rounded-2xl border border-green-200">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-center space-x-3">
@@ -413,21 +727,46 @@ function DietPlanner() {
                       <Apple className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-semibold text-gray-600">
-                        Total Nutrisi Rencana
+                      <p className="text-xs sm:text-sm font-semibold text-gray-600 flex items-center">
+                        Status Nutrisi Hari Ini
+                        {dietPlan.isSmartGenerated && (
+                          <Shield className="h-3 w-3 ml-2 text-green-600" />
+                        )}
                       </p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center space-x-2">
-                        <span>{dietPlan.totalCalories || 0} kcal</span>
-                        <span className="text-base font-medium text-gray-600">
-                          {parseFloat(dietPlan.totalProtein || 0).toFixed(1)}g P
-                        </span>
-                        <span className="text-base font-medium text-gray-600">
-                          {parseFloat(dietPlan.totalCarbs || 0).toFixed(1)}g K
-                        </span>
-                        <span className="text-base font-medium text-gray-600">
-                          {parseFloat(dietPlan.totalFats || 0).toFixed(1)}g L
-                        </span>
-                      </p>
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-4">
+                          <div className="text-center">
+                            <p className="text-lg sm:text-xl font-bold text-gray-800">
+                              {dailyTotals.totalCalories}
+                            </p>
+                            <p className="text-xs text-gray-500">Dikonsumsi</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-lg sm:text-xl font-bold text-blue-600">
+                              {dietPlan.totalCalories || 0}
+                            </p>
+                            <p className="text-xs text-gray-500">Rencana</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 text-sm text-gray-600 flex-wrap">
+                          <span>
+                            P:{" "}
+                            {parseFloat(dailyTotals.totalProtein || 0).toFixed(
+                              1
+                            )}
+                            g
+                          </span>
+                          <span>
+                            K:{" "}
+                            {parseFloat(dailyTotals.totalCarbs || 0).toFixed(1)}
+                            g
+                          </span>
+                          <span>
+                            L:{" "}
+                            {parseFloat(dailyTotals.totalFats || 0).toFixed(1)}g
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className="text-left sm:text-right">
@@ -435,6 +774,28 @@ function DietPlanner() {
                     <p className="text-sm font-bold text-gray-700">
                       {profile?.dailyCalories || 2000} kcal
                     </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {dailyTotals.totalCalories && profile?.dailyCalories
+                        ? `${(
+                            (dailyTotals.totalCalories /
+                              profile.dailyCalories) *
+                            100
+                          ).toFixed(0)}% tercapai`
+                        : ""}
+                    </p>
+                    <div className="w-20 h-1.5 bg-gray-200 rounded-full mt-2">
+                      <div
+                        className="h-full bg-gradient-to-r from-green-500 to-emerald-600 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(
+                            (dailyTotals.totalCalories /
+                              (profile?.dailyCalories || 2000)) *
+                              100,
+                            100
+                          )}%`,
+                        }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -445,99 +806,219 @@ function DietPlanner() {
                   .filter(([key]) =>
                     ["breakfast", "lunch", "dinner"].includes(key)
                   )
-                  .map(([mealKey, meal]) => (
-                    <div
-                      key={mealKey}
-                      className="group relative overflow-hidden bg-gradient-to-br from-white/50 to-white/30 p-4 sm:p-6 rounded-2xl border border-white/20 hover:shadow-lg transition-all duration-300 hover:scale-105"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  .map(([mealKey, meal]) => {
+                    const isConsumed = isMealConsumed(meal, mealKey);
 
-                      <div className="relative">
-                        <div className="flex items-center justify-between mb-3 sm:mb-4">
-                          <div
-                            className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r ${getMealGradient(
-                              mealKey
-                            )} rounded-2xl flex items-center justify-center shadow-lg`}
+                    return (
+                      <div
+                        key={mealKey}
+                        className={`group relative overflow-hidden bg-gradient-to-br ${
+                          isConsumed
+                            ? "from-green-50 to-emerald-50 border-green-200"
+                            : "from-white/50 to-white/30 border-white/20"
+                        } p-4 sm:p-6 rounded-2xl border hover:shadow-lg transition-all duration-300 hover:scale-105`}
+                      >
+                        {isConsumed && (
+                          <div className="absolute top-2 right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                            <Check className="h-4 w-4 text-white" />
+                          </div>
+                        )}
+
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                        <div className="relative">
+                          <div className="flex items-center justify-between mb-3 sm:mb-4">
+                            <div
+                              className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r ${getMealGradient(
+                                mealKey
+                              )} rounded-2xl flex items-center justify-center shadow-lg`}
+                            >
+                              {getMealIcon(mealKey)}
+                            </div>
+                            <span className="text-xs text-gray-500 bg-white/70 px-2 py-1 rounded-full">
+                              {meal.time || "Waktu fleksibel"}
+                            </span>
+                          </div>
+
+                          <div className="mb-3 sm:mb-4">
+                            <p className="text-xs sm:text-sm font-semibold text-gray-500 mb-1 capitalize">
+                              {getMealTime(mealKey)}
+                            </p>
+                            <h3 className="font-bold text-gray-800 text-sm sm:text-lg leading-tight">
+                              {meal.name || "Menu Tidak Tersedia"}
+                            </h3>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
+                            <div className="flex items-center space-x-1">
+                              <Flame className="h-3 w-3 text-orange-500" />
+                              <span className="text-xs sm:text-sm font-bold text-gray-700">
+                                {meal.calories || 0} kcal
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Activity className="h-3 w-3 text-blue-500" />
+                              <span className="text-xs sm:text-sm font-bold text-gray-700">
+                                {parseFloat(meal.protein || 0).toFixed(1)}g
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <UtensilsCrossed className="h-3 w-3 text-red-500" />
+                              <span className="text-xs sm:text-sm font-bold text-gray-700">
+                                {parseFloat(meal.carbs || 0).toFixed(1)}g
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Tag className="h-3 w-3 text-green-500" />
+                              <span className="text-xs sm:text-sm font-bold text-gray-700">
+                                {parseFloat(meal.fats || 0).toFixed(1)}g
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Consume Button */}
+                          <button
+                            onClick={() => consumeMealFromPlan(meal, mealKey)}
+                            disabled={isConsumed}
+                            className={`w-full py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-300 flex items-center justify-center space-x-2 ${
+                              isConsumed
+                                ? "bg-green-100 text-green-700 cursor-not-allowed"
+                                : "bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white hover:shadow-lg hover:scale-105"
+                            }`}
                           >
-                            {getMealIcon(mealKey)}
-                          </div>
-                          <span className="text-xs text-gray-500 bg-white/70 px-2 py-1 rounded-full">
-                            {meal.time || "Waktu fleksibel"}
-                          </span>
-                        </div>
+                            {isConsumed ? (
+                              <>
+                                <CheckCircle className="h-4 w-4" />
+                                <span>Sudah Dikonsumsi</span>
+                              </>
+                            ) : (
+                              <>
+                                <Utensils className="h-4 w-4" />
+                                <span>Tandai Sudah Dimakan</span>
+                              </>
+                            )}
+                          </button>
 
-                        <div className="mb-3 sm:mb-4">
-                          <p className="text-xs sm:text-sm font-semibold text-gray-500 mb-1 capitalize">
-                            {getMealTime(mealKey)}
-                          </p>
-                          <h3 className="font-bold text-gray-800 text-sm sm:text-lg leading-tight">
-                            {meal.name || "Menu Tidak Tersedia"}
-                          </h3>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                          <div className="flex items-center space-x-1">
-                            <Flame className="h-3 w-3 text-orange-500" />
-                            <span className="text-xs sm:text-sm font-bold text-gray-700">
-                              {meal.calories || 0} kcal
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Activity className="h-3 w-3 text-blue-500" />
-                            <span className="text-xs sm:text-sm font-bold text-gray-700">
-                              {parseFloat(meal.protein || 0).toFixed(1)}g
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <UtensilsCrossed className="h-3 w-3 text-red-500" />
-                            <span className="text-xs sm:text-sm font-bold text-gray-700">
-                              {parseFloat(meal.carbs || 0).toFixed(1)}g
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Tag className="h-3 w-3 text-green-500" />
-                            <span className="text-xs sm:text-sm font-bold text-gray-700">
-                              {parseFloat(meal.fats || 0).toFixed(1)}g
-                            </span>
-                          </div>
+                          {/* Smart recommendation indicator */}
+                          {dietPlan.isSmartGenerated && (
+                            <div className="mt-3 flex items-center space-x-1 text-xs text-green-600">
+                              <Brain className="h-3 w-3" />
+                              <span>Dipilih sesuai tujuan diet</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
 
-              {/* Tips Card */}
+              {/* Analysis & Tips Card */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 sm:p-6 rounded-2xl border border-blue-200">
                 <div className="flex items-center space-x-3 mb-3 sm:mb-4">
                   <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                    <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+                    <Info className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                   </div>
                   <h3 className="font-bold text-gray-800 text-sm sm:text-base">
-                    Tips Hari Ini
+                    Analisis Rencana & Tips
                   </h3>
                 </div>
-                <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
-                  Konsumsi makanan sesuai jadwal untuk hasil optimal. Jangan
-                  lupa minum air putih minimal 8 gelas per hari dan lakukan
-                  aktivitas fisik ringan seperti jalan kaki 30 menit.
-                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-gray-700 text-sm">
+                      Kesesuaian dengan Target:
+                    </h4>
+                    {profile?.dailyCalories && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Kalori:</span>
+                          <span
+                            className={`font-semibold ${
+                              Math.abs(
+                                dietPlan.totalCalories - profile.dailyCalories
+                              ) <= 100
+                                ? "text-green-600"
+                                : "text-orange-600"
+                            }`}
+                          >
+                            {dietPlan.totalCalories} / {profile.dailyCalories}{" "}
+                            kcal
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${Math.min(
+                                (dietPlan.totalCalories /
+                                  profile.dailyCalories) *
+                                  100,
+                                100
+                              )}%`,
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-gray-700 text-sm">
+                      Tips Hari Ini:
+                    </h4>
+                    <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
+                      {dietPlan.isSmartGenerated
+                        ? `Rencana ini dipilih khusus untuk ${dietGoal.toLowerCase()}. Ikuti jadwal makan dan jangan lewatkan sesi olahraga.`
+                        : "Rencana umum telah dibuat. Sesuaikan porsi sesuai kebutuhan kalori harian Anda."}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
             <div className="text-center py-12 sm:py-16 bg-gradient-to-br from-gray-50/50 to-gray-100/50 rounded-2xl border border-gray-200/50">
               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-gray-300 to-gray-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                <UtensilsCrossed className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
+                <Brain className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
               </div>
               <h3 className="text-lg sm:text-xl font-bold text-gray-700 mb-2">
-                Belum Ada Rencana
+                Siap Membuat Rencana Cerdas
               </h3>
               <p className="text-gray-500 mb-4 sm:mb-6 max-w-md mx-auto text-sm sm:text-base px-4">
-                Buat rencana diet harian Anda dengan mengklik tombol "Buat
-                Rencana Harian" di atas.
+                Asisten diet akan menganalisis profil Anda dan memberikan
+                rekomendasi menu yang paling sesuai dengan tujuan diet.
               </p>
-              <div className="flex items-center justify-center space-x-2 text-xs sm:text-sm text-gray-400">
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span>Rencana akan disesuaikan dengan tujuan diet Anda</span>
+              <div className="flex items-center justify-center space-x-2 text-xs sm:text-sm text-gray-400 mb-6">
+                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span>
+                  {recommendations.length >= 3
+                    ? `${recommendations.length} menu cocok ditemukan untuk ${dietGoal}`
+                    : `Menu terbatas - akan memberikan saran alternatif`}
+                </span>
+              </div>
+
+              {/* Preview of what will be generated */}
+              <div className="bg-white/50 p-4 rounded-xl max-w-sm mx-auto">
+                <h4 className="font-semibold text-gray-700 mb-2 text-sm">
+                  Yang akan Anda dapatkan:
+                </h4>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="h-3 w-3 text-green-500" />
+                    <span>3 menu sesuai tujuan diet</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="h-3 w-3 text-green-500" />
+                    <span>Kalkulasi nutrisi lengkap</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="h-3 w-3 text-green-500" />
+                    <span>Jadwal makan yang optimal</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="h-3 w-3 text-green-500" />
+                    <span>Tips personal sesuai profil</span>
+                  </li>
+                </ul>
               </div>
             </div>
           )}

@@ -427,14 +427,27 @@ function AdminPage() {
         }
       } else {
         // Logika baru untuk menghitung total nutrisi
-        let allIngredientIds = [];
+        let baseIngredientIds = [];
         if (menuTemplate.components) {
-          allIngredientIds = Object.values(menuTemplate.components).flatMap(
-            (comp) => comp.options || []
+          Object.entries(menuTemplate.components).forEach(
+            ([category, config]) => {
+              // Untuk sayuran di paket campuran, skip dari perhitungan base
+              if (
+                category === "sayuran" &&
+                menuTemplate.type === "paket-campuran"
+              ) {
+                return; // Skip sayuran untuk paket campuran
+              }
+
+              // Tambahkan komponen lainnya
+              if (config.options && Array.isArray(config.options)) {
+                baseIngredientIds = [...baseIngredientIds, ...config.options];
+              }
+            }
           );
         }
 
-        const totals = allIngredientIds.reduce(
+        const totals = baseIngredientIds.reduce(
           (acc, id) => {
             const ingredient = ingredientsData.find((item) => item.id === id);
             if (ingredient) {
@@ -472,11 +485,12 @@ function AdminPage() {
           components: menuTemplate.components,
           dietOptions: menuTemplate.dietOptions,
           dietPriceAdd: menuTemplate.dietPriceAdd,
-          // Tambahkan total nutrisi hasil kalkulasi
-          calories: totals.totalCalories,
-          protein: totals.totalProtein,
-          carbs: totals.totalCarbs,
-          fats: totals.totalFats,
+
+          // Bulatkan hasil kalkulasi menjadi 1 angka desimal sebelum disimpan
+          calories: Math.round(totals.totalCalories),
+          protein: parseFloat(totals.totalProtein.toFixed(1)),
+          carbs: parseFloat(totals.totalCarbs.toFixed(1)),
+          fats: parseFloat(totals.totalFats.toFixed(1)),
         };
 
         if (editingTemplate) {

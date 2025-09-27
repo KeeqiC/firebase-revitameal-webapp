@@ -14,7 +14,12 @@ import {
   Upload,
   X,
   CheckCircle,
+  Plus,
+  Flame,
+  Target,
+  TrendingUp,
 } from "lucide-react";
+
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import {
@@ -37,12 +42,23 @@ function FoodJournal() {
     time: "",
     notes: "",
     photo: null,
+    calories: "",
+    protein: "",
+    carbs: "",
+    fats: "",
   });
   const [journalHistory, setJournalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
+  const [menuData, setMenuData] = useState([]);
+  const [dailyStats, setDailyStats] = useState({
+    totalEntries: 0,
+    trackedEntries: 0,
+    estimatedCalories: 0,
+  });
+  const [isCustomFood, setIsCustomFood] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -59,10 +75,39 @@ function FoodJournal() {
         ...d.data(),
       }));
       setJournalHistory(entries);
+
+      const today = format(new Date(), "yyyy-MM-dd");
+      const todayEntries = entries.filter((entry) => entry.date === today);
+      const trackedEntries = todayEntries.filter(
+        (entry) => entry.addedToTracker
+      );
+      const estimatedCalories = todayEntries.reduce(
+        (sum, entry) => sum + (entry.calories || 0),
+        0
+      );
+
+      setDailyStats({
+        totalEntries: todayEntries.length,
+        trackedEntries: trackedEntries.length,
+        estimatedCalories,
+      });
+
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const menuCollectionRef = collection(db, "revitameal_menu_templates");
+    const unsubMenu = onSnapshot(menuCollectionRef, (snapshot) => {
+      const menu = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setMenuData(menu);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubMenu();
+    };
   }, [currentUser]);
 
   const handleChange = (e) => {
@@ -92,6 +137,12 @@ function FoodJournal() {
     e.preventDefault();
     if (!currentUser || !journalEntry.name.trim()) return;
 
+    // Validation for custom food
+    if (isCustomFood && (!journalEntry.calories || journalEntry.calories <= 0)) {
+      alert("Untuk makanan custom, harap masukkan informasi kalori yang valid.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const journalRef = collection(
@@ -104,10 +155,16 @@ function FoodJournal() {
         name: journalEntry.name.trim(),
         time: journalEntry.time,
         notes: journalEntry.notes.trim() || "",
+        calories: parseInt(journalEntry.calories) || 0,
+        protein: parseFloat(journalEntry.protein) || 0,
+        carbs: parseFloat(journalEntry.carbs) || 0,
+        fats: parseFloat(journalEntry.fats) || 0,
         timestamp: serverTimestamp(),
-        // Note: In production, you would upload to Firebase Storage first
         photoUrl: previewImage || null,
         date: format(new Date(), "yyyy-MM-dd"),
+        addedToTracker: false,
+        isCustomFood: isCustomFood,
+        source: isCustomFood ? "custom" : "menu",
       });
 
       // Reset form
@@ -116,7 +173,12 @@ function FoodJournal() {
         time: "",
         notes: "",
         photo: null,
+        calories: "",
+        protein: "",
+        carbs: "",
+        fats: "",
       });
+      setIsCustomFood(false);
       setPreviewImage(null);
 
       // Reset file input
@@ -142,6 +204,52 @@ function FoodJournal() {
     } catch (error) {
       console.error("Error deleting entry:", error);
       alert("Gagal menghapus catatan.");
+    }
+  };
+
+  const addToCalorieTracker = async (entry) => {
+    if (!entry.calories || entry.calories <= 0) {
+      alert(
+        "Entry ini tidak memiliki data kalori. Tambahkan kalori terlebih dahulu untuk melakukan tracking."
+      );
+      return;
+    }
+
+    if (entry.addedToTracker) {
+      alert("Entry ini sudah ditambahkan ke Calorie Tracker.");
+      return;
+    }
+
+    try {
+      const today = format(new Date(), "yyyy-MM-dd");
+      const logDocRef = doc(db, "users", currentUser.uid, "dailyLogs", today);
+      const mealsCollectionRef = collection(logDocRef, "meals");
+
+      // Add to calorie tracker
+      await addDoc(mealsCollectionRef, {
+        name: entry.name,
+        calories: entry.calories || 0,
+        protein: entry.protein || 0,
+        carbs: entry.carbs || 0,
+        fats: entry.fats || 0,
+        fromJournal: true,
+        journalEntryId: entry.id,
+        timestamp: serverTimestamp(),
+      });
+
+      // Update daily totals (get current totals first)
+      // This would need to be implemented properly with a transaction
+
+      // Mark entry as added to tracker
+      await doc(db, "users", currentUser.uid, "foodJournal", entry.id).update({
+        addedToTracker: true,
+      });
+
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (error) {
+      console.error("Error adding to calorie tracker:", error);
+      alert("Gagal menambahkan ke Calorie Tracker.");
     }
   };
 
@@ -187,6 +295,59 @@ function FoodJournal() {
           </p>
         </header>
 
+        {/* Daily Stats */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white/70 backdrop-blur-xl border border-white/30 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <FileText className="h-5 w-5 text-white" />
+              </div>
+              <BookOpen className="h-5 w-5 text-blue-500" />
+            </div>
+            <p className="text-sm font-semibold text-gray-500 mb-2">
+              Catatan Hari Ini
+            </p>
+            <h3 className="text-2xl font-black text-gray-800">
+              {dailyStats.totalEntries}
+            </h3>
+            <span className="text-sm text-gray-500">entries</span>
+          </div>
+
+          <div className="bg-white/70 backdrop-blur-xl border border-white/30 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                <Target className="h-5 w-5 text-white" />
+              </div>
+              <TrendingUp className="h-5 w-5 text-green-500" />
+            </div>
+            <p className="text-sm font-semibold text-gray-500 mb-2">
+              Sudah di-Track
+            </p>
+            <h3 className="text-2xl font-black text-gray-800">
+              {dailyStats.trackedEntries}
+            </h3>
+            <span className="text-sm text-gray-500">
+              dari {dailyStats.totalEntries}
+            </span>
+          </div>
+
+          <div className="bg-white/70 backdrop-blur-xl border border-white/30 p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+                <Flame className="h-5 w-5 text-white" />
+              </div>
+              <Activity className="h-5 w-5 text-orange-500" />
+            </div>
+            <p className="text-sm font-semibold text-gray-500 mb-2">
+              Est. Kalori
+            </p>
+            <h3 className="text-2xl font-black text-gray-800">
+              {dailyStats.estimatedCalories}
+            </h3>
+            <span className="text-sm text-gray-500">kcal</span>
+          </div>
+        </section>
+
         {/* Success Message */}
         {showSuccess && (
           <div className="mb-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white p-4 rounded-2xl shadow-xl flex items-center space-x-3">
@@ -211,15 +372,109 @@ function FoodJournal() {
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Nama Makanan / Waktu Makan
                 </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={journalEntry.name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
-                  placeholder="Contoh: Sarapan Nasi Gudeg"
-                  required
-                />
+                {/* Toggle between menu and custom */}
+                <div className="mb-3 flex items-center space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomFood(false);
+                      setJournalEntry((prev) => ({
+                        ...prev,
+                        name: "",
+                        calories: "",
+                        protein: "",
+                        carbs: "",
+                        fats: "",
+                      }));
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      !isCustomFood
+                        ? "bg-[#F27F34] text-white shadow-md"
+                        : "bg-white/50 text-gray-600 hover:bg-white/70"
+                    }`}
+                  >
+                    Dari Menu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomFood(true);
+                      setJournalEntry((prev) => ({
+                        ...prev,
+                        name: "",
+                        calories: "",
+                        protein: "",
+                        carbs: "",
+                        fats: "",
+                      }));
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      isCustomFood
+                        ? "bg-[#F27F34] text-white shadow-md"
+                        : "bg-white/50 text-gray-600 hover:bg-white/70"
+                    }`}
+                  >
+                    Makanan Custom
+                  </button>
+                </div>
+
+                {isCustomFood ? (
+                  /* Custom Food Input */
+                  <input
+                    type="text"
+                    name="name"
+                    value={journalEntry.name}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                    placeholder="Contoh: Bakso Malang, Soto Ayam, dll"
+                    required
+                  />
+                ) : (
+                  /* Menu Selection */
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      name="name"
+                      value={journalEntry.name}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
+                      placeholder="Ketik nama makanan atau pilih dari menu"
+                      required
+                    />
+
+                    {/* Quick Select dari Menu */}
+                    <div>
+                      <p className="text-xs text-gray-600 mb-2">
+                        Pilih dari menu Revitameal:
+                      </p>
+                      <select
+                        onChange={(e) => {
+                          const selectedMenu = menuData.find(
+                            (m) => m.id === e.target.value
+                          );
+                          if (selectedMenu) {
+                            setJournalEntry((prev) => ({
+                              ...prev,
+                              name: selectedMenu.name,
+                              calories: selectedMenu.calories || "",
+                              protein: selectedMenu.protein || "",
+                              carbs: selectedMenu.carbs || "",
+                              fats: selectedMenu.fats || "",
+                            }));
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded-lg bg-white/50 border border-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50"
+                      >
+                        <option value="">Pilih dari menu...</option>
+                        {menuData.map((menu) => (
+                          <option key={menu.id} value={menu.id}>
+                            {menu.name} - {menu.calories || 0} kcal
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -234,6 +489,66 @@ function FoodJournal() {
                   className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
                   required
                 />
+              </div>
+            </div>
+
+            {/* Nutrition Fields */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Informasi Nutrisi {isCustomFood ? "(Wajib untuk custom food)" : "(Opsional)"}
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <input
+                    type="number"
+                    name="calories"
+                    value={journalEntry.calories}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 rounded-lg bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50"
+                    placeholder="Kalori"
+                    min="0"
+                  />
+                  <span className="text-xs text-gray-500">kcal</span>
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    name="protein"
+                    value={journalEntry.protein}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 rounded-lg bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50"
+                    placeholder="Protein"
+                    min="0"
+                    step="0.1"
+                  />
+                  <span className="text-xs text-gray-500">gram</span>
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    name="carbs"
+                    value={journalEntry.carbs}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 rounded-lg bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50"
+                    placeholder="Karbo"
+                    min="0"
+                    step="0.1"
+                  />
+                  <span className="text-xs text-gray-500">gram</span>
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    name="fats"
+                    value={journalEntry.fats}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 rounded-lg bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50"
+                    placeholder="Lemak"
+                    min="0"
+                    step="0.1"
+                  />
+                  <span className="text-xs text-gray-500">gram</span>
+                </div>
               </div>
             </div>
 
@@ -361,6 +676,11 @@ function FoodJournal() {
                           <h3 className="font-bold text-gray-800 text-lg mb-1">
                             {entry.name}
                           </h3>
+                          {entry.isCustomFood && (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                              Custom
+                            </span>
+                          )}
 
                           <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
                             <span className="flex items-center space-x-1">
@@ -388,10 +708,54 @@ function FoodJournal() {
                           )}
                         </div>
 
-                        {/* Delete button - visible on hover */}
+                        {/* Nutrition Info */}
+                        {(entry.calories > 0 ||
+                          entry.protein > 0 ||
+                          entry.carbs > 0 ||
+                          entry.fats > 0) && (
+                          <div className="flex items-center space-x-4 text-xs text-gray-500 bg-gradient-to-r from-orange-50 to-red-50 px-3 py-2 rounded-lg mb-3">
+                            {entry.calories > 0 && (
+                              <span className="flex items-center space-x-1">
+                                <Flame className="h-3 w-3 text-orange-500" />
+                                <span>{entry.calories} kcal</span>
+                              </span>
+                            )}
+                            {entry.protein > 0 && (
+                              <span className="flex items-center space-x-1">
+                                <Activity className="h-3 w-3 text-blue-500" />
+                                <span>{entry.protein}g protein</span>
+                              </span>
+                            )}
+                            {entry.carbs > 0 && (
+                              <span>{entry.carbs}g karbo</span>
+                            )}
+                            {entry.fats > 0 && <span>{entry.fats}g lemak</span>}
+                          </div>
+                        )}
+
+                        {/* Status badge */}
+                        {entry.addedToTracker && (
+                          <span className="inline-flex items-center space-x-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Sudah di-track</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        {!entry.addedToTracker && entry.calories > 0 && (
+                          <button
+                            onClick={() => addToCalorieTracker(entry)}
+                            className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
+                            title="Tambah ke Calorie Tracker"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => deleteEntry(entry.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
                           title="Hapus catatan"
                         >
                           <X className="h-4 w-4" />

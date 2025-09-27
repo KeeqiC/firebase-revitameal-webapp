@@ -15,6 +15,7 @@ import {
   ArrowRight,
   AlertCircle,
   Filter,
+  Tag,
   Star,
   Clock,
   Flame,
@@ -59,6 +60,7 @@ function VegetableSelectionModal({
   ingredients,
   onAddToCart,
   onCheckoutNow,
+  calculateTotalNutrition,
 }) {
   const [selectedVegetable, setSelectedVegetable] = useState(null);
 
@@ -206,11 +208,23 @@ function VegetableSelectionModal({
               <p className="text-green-700 font-medium text-sm sm:text-base">
                 {selectedVegDetails.name}
               </p>
-              <div className="flex items-center space-x-2 sm:space-x-4 text-xs sm:text-sm text-green-600 mt-1">
-                <span>{selectedVegDetails.calories || 0} kalori</span>
-                <span>•</span>
-                <span>Kaya nutrisi dan serat</span>
-              </div>
+              {(() => {
+                const totalNutrition = calculateTotalNutrition(
+                  menu,
+                  selectedVegetable
+                );
+                return (
+                  <div className="flex items-center space-x-2 sm:space-x-4 text-xs sm:text-sm text-green-600 mt-1">
+                    <span>Total: {totalNutrition.totalCalories} kalori</span>
+                    <span>•</span>
+                    <span>
+                      {totalNutrition.totalProtein.toFixed(1)}g protein
+                    </span>
+                    <span>•</span>
+                    <span>Kaya nutrisi dan serat</span>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -264,10 +278,36 @@ function LunchBoost() {
     return ingredientsData.find((ingredient) => ingredient.id === ingredientId);
   };
 
-  // Helper function to get multiple ingredients by IDs
+  // Tambahkan setelah fungsi getIngredientsByIds
   const getIngredientsByIds = (ingredientIds) => {
     if (!ingredientIds || !Array.isArray(ingredientIds)) return [];
     return ingredientIds.map((id) => getIngredientById(id)).filter(Boolean);
+  };
+
+  // TAMBAH FUNGSI BARU INI:
+  const calculateTotalNutrition = (menu, selectedVegetableId = null) => {
+    let totalCalories = menu.calories || 0;
+    let totalProtein = menu.protein || 0;
+    let totalCarbs = menu.carbs || 0;
+    let totalFats = menu.fats || 0;
+
+    // Jika ada sayuran yang dipilih, tambahkan nutrisi sayuran
+    if (selectedVegetableId && menu.type === "paket-campuran") {
+      const selectedVegetable = getIngredientById(selectedVegetableId);
+      if (selectedVegetable) {
+        totalCalories += selectedVegetable.calories || 0;
+        totalProtein += selectedVegetable.protein || 0;
+        totalCarbs += selectedVegetable.carbs || 0;
+        totalFats += selectedVegetable.fats || 0;
+      }
+    }
+
+    return {
+      totalCalories: Math.round(totalCalories),
+      totalProtein: parseFloat(totalProtein.toFixed(1)),
+      totalCarbs: parseFloat(totalCarbs.toFixed(1)),
+      totalFats: parseFloat(totalFats.toFixed(1)),
+    };
   };
 
   // Load both menu data and ingredients
@@ -583,6 +623,7 @@ function LunchBoost() {
         ingredients={ingredientsData}
         onAddToCart={addToCart}
         onCheckoutNow={handleCheckoutNow}
+        calculateTotalNutrition={calculateTotalNutrition}
       />
 
       <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-hidden">
@@ -762,15 +803,30 @@ function LunchBoost() {
                       <div className="flex items-center space-x-4 text-xs text-gray-500 bg-gray-50/50 px-3 py-2 rounded-xl">
                         <div className="flex items-center space-x-1">
                           <Flame className="h-3 w-3 text-orange-500" />
-                          <span>{menu.calories || "350-450"} kcal</span>
+                          <span>
+                            {menu.calories
+                              ? parseFloat(menu.calories).toFixed(1)
+                              : "0"}{" "}
+                            kcal
+                          </span>
                         </div>
                         <div className="flex items-center space-x-1">
-                          <Clock className="h-3 w-3 text-blue-500" />
-                          <span>15-20 menit</span>
+                          <Heart className="h-3 w-3 text-blue-500" />
+                          <span>
+                            {menu.protein
+                              ? parseFloat(menu.protein).toFixed(1)
+                              : "0"}
+                            g Protein
+                          </span>
                         </div>
                         <div className="flex items-center space-x-1">
-                          <Heart className="h-3 w-3 text-green-500" />
-                          <span>Sehat</span>
+                          <Activity className="h-3 w-3 text-green-500" />
+                          <span>
+                            {menu.fats
+                              ? parseFloat(menu.fats).toFixed(1)
+                              : "0"}
+                            g Lemak
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -860,6 +916,35 @@ function LunchBoost() {
                                     item.selectedVegetable
                                   )}
                                 </p>
+                              )}
+
+                              {/* Show nutrition info for items with selected vegetable */}
+                              {item.selectedVegetable && (
+                                <div className="text-xs text-gray-600 mt-1">
+                                  {(() => {
+                                    const nutrition = calculateTotalNutrition(
+                                      item,
+                                      item.selectedVegetable
+                                    );
+                                    return (
+                                      <div className="flex items-center space-x-3">
+                                        <span className="flex items-center space-x-1">
+                                          <Flame className="h-3 w-3 text-orange-500" />
+                                          <span>
+                                            {nutrition.totalCalories} kcal
+                                          </span>
+                                        </span>
+                                        <span className="flex items-center space-x-1">
+                                          <Activity className="h-3 w-3 text-blue-500" />
+                                          <span>
+                                            {nutrition.totalProtein.toFixed(1)}g
+                                            protein
+                                          </span>
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
                               )}
 
                               {/* Show item components in cart */}

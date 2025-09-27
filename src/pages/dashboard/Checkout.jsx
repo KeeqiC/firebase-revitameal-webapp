@@ -13,6 +13,8 @@ import {
   CreditCard,
   Truck,
   Clock,
+  Flame,
+  Activity,
   Shield,
 } from "lucide-react";
 
@@ -27,6 +29,7 @@ import {
   updateDoc,
   serverTimestamp,
   onSnapshot,
+  // calculateTotalNutrition,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -75,6 +78,36 @@ const useAuth = () => {
     return unsubscribe;
   }, []);
   return { currentUser };
+};
+
+const calculateTotalNutrition = (
+  menu,
+  selectedVegetableId = null,
+  ingredients = []
+) => {
+  let totalCalories = menu.calories || 0;
+  let totalProtein = menu.protein || 0;
+  let totalCarbs = menu.carbs || 0;
+  let totalFats = menu.fats || 0;
+
+  if (selectedVegetableId && menu.type === "paket-campuran") {
+    const selectedVegetable = ingredients.find(
+      (ing) => ing.id === selectedVegetableId
+    );
+    if (selectedVegetable) {
+      totalCalories += selectedVegetable.calories || 0;
+      totalProtein += selectedVegetable.protein || 0;
+      totalCarbs += selectedVegetable.carbs || 0;
+      totalFats += selectedVegetable.fats || 0;
+    }
+  }
+
+  return {
+    totalCalories: Math.round(totalCalories),
+    totalProtein: Math.round(totalProtein * 10) / 10,
+    totalCarbs: Math.round(totalCarbs * 10) / 10,
+    totalFats: Math.round(totalFats * 10) / 10,
+  };
 };
 
 function Checkout() {
@@ -543,6 +576,33 @@ function Checkout() {
                             + Sayur:{" "}
                             {getIngredientNameById(item.selectedVegetable)}
                           </p>
+                        )}
+                        {/* Tambah informasi nutrisi */}
+                        {item.selectedVegetable && (
+                          <div className="text-xs text-gray-600 mt-1">
+                            {(() => {
+                              const nutrition = calculateTotalNutrition(
+                                item,
+                                item.selectedVegetable,
+                                ingredients
+                              );
+                              return (
+                                <div className="flex items-center space-x-3">
+                                  <span className="flex items-center space-x-1">
+                                    <Flame className="h-3 w-3 text-orange-500" />
+                                    <span>{nutrition.totalCalories} kcal</span>
+                                  </span>
+                                  <span className="flex items-center space-x-1">
+                                    <Activity className="h-3 w-3 text-blue-500" />
+                                    <span>
+                                      {nutrition.totalProtein.toFixed(1)}g
+                                      protein
+                                    </span>
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </div>
                         )}
                         <p className="text-xs sm:text-sm text-gray-500">
                           {item.quantity} × Rp

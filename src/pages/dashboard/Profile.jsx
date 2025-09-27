@@ -1,5 +1,7 @@
 // src/pages/dashboard/Profile.jsx
+
 import { useState, useEffect } from "react";
+
 import {
   User,
   Mail,
@@ -14,7 +16,9 @@ import {
   Edit3,
   Check,
   AlertCircle,
+  Calculator,
 } from "lucide-react";
+
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
@@ -26,7 +30,6 @@ function Profile() {
     email: "",
     currentWeight: "",
     targetWeight: "",
-    dailyCalories: "",
     dietGoal: "",
     foodAllergies: "",
     height: "",
@@ -52,7 +55,6 @@ function Profile() {
               email: currentUser.email || "",
               currentWeight: userData.currentWeight || "",
               targetWeight: userData.targetWeight || "",
-              dailyCalories: userData.dailyCalories || "",
               dietGoal: userData.dietGoal || "",
               foodAllergies: userData.foodAllergies || "",
               height: userData.height || "",
@@ -99,6 +101,74 @@ function Profile() {
     return { status: "Obese", color: "text-red-600" };
   };
 
+  // Fungsi untuk menghitung BMR (Basal Metabolic Rate) menggunakan rumus Mifflin-St Jeor
+  const calculateBMR = () => {
+    if (
+      !profile.currentWeight ||
+      !profile.height ||
+      !profile.age ||
+      !profile.gender
+    ) {
+      return null;
+    }
+
+    const weight = parseFloat(profile.currentWeight);
+    const height = parseFloat(profile.height);
+    const age = parseFloat(profile.age);
+
+    let bmr;
+    if (profile.gender === "Laki-laki") {
+      // BMR untuk pria = 10 × berat(kg) + 6.25 × tinggi(cm) - 5 × usia(tahun) + 5
+      bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+    } else if (profile.gender === "Perempuan") {
+      // BMR untuk wanita = 10 × berat(kg) + 6.25 × tinggi(cm) - 5 × usia(tahun) - 161
+      bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+    }
+
+    return bmr ? Math.round(bmr) : null;
+  };
+
+  // Fungsi untuk menghitung TDEE (Total Daily Energy Expenditure)
+  const calculateTDEE = () => {
+    const bmr = calculateBMR();
+    if (!bmr || !profile.activityLevel) return null;
+
+    const activityMultipliers = {
+      "Sangat Rendah": 1.2,
+      Rendah: 1.375,
+      Sedang: 1.55,
+      Tinggi: 1.725,
+      "Sangat Tinggi": 1.9,
+    };
+
+    const multiplier = activityMultipliers[profile.activityLevel];
+    return multiplier ? Math.round(bmr * multiplier) : null;
+  };
+
+  // Fungsi untuk menghitung kalori berdasarkan tujuan diet
+  const calculateDailyCalories = () => {
+    const tdee = calculateTDEE();
+    if (!tdee || !profile.dietGoal) return null;
+
+    let calorieAdjustment = 0;
+    switch (profile.dietGoal) {
+      case "Menurunkan Berat Badan":
+        calorieAdjustment = -500; // Defisit 500 kalori untuk turun ~0.5kg per minggu
+        break;
+      case "Menambah Massa Otot":
+        calorieAdjustment = 300; // Surplus 300 kalori untuk menambah massa
+        break;
+      case "Mempertahankan Berat Badan":
+      case "Gaya Hidup Sehat":
+        calorieAdjustment = 0; // Maintenance calories
+        break;
+      default:
+        calorieAdjustment = 0;
+    }
+
+    return Math.round(tdee + calorieAdjustment);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -108,6 +178,12 @@ function Profile() {
       const docRef = doc(db, "users", currentUser.uid);
       const profileData = { ...profile };
       delete profileData.email; // Don't save email to Firestore
+
+      // Tambahkan kalori yang dihitung otomatis ke data yang disimpan
+      const calculatedCalories = calculateDailyCalories();
+      if (calculatedCalories) {
+        profileData.dailyCalories = calculatedCalories;
+      }
 
       await updateDoc(docRef, profileData);
       setShowSuccess(true);
@@ -132,6 +208,9 @@ function Profile() {
 
   const bmi = calculateBMI();
   const bmiStatus = getBMIStatus(bmi);
+  const bmr = calculateBMR();
+  const tdee = calculateTDEE();
+  const dailyCalories = calculateDailyCalories();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 relative overflow-hidden">
@@ -307,7 +386,7 @@ function Profile() {
 
             {/* BMI Calculator */}
             {bmi && (
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200 mb-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-bold text-gray-800 mb-1">
@@ -323,6 +402,58 @@ function Profile() {
                   <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
                     <Activity className="h-8 w-8 text-white" />
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Calorie Calculator Display */}
+            {bmr && (
+              <div className="bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-2xl border border-orange-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-800 flex items-center">
+                    <Calculator className="h-5 w-5 mr-2 text-orange-600" />
+                    Kalkulasi Kalori Otomatis
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-white/50 rounded-xl">
+                    <p className="text-sm text-gray-600 mb-1">
+                      BMR (Kalori Dasar)
+                    </p>
+                    <p className="text-2xl font-bold text-gray-800">{bmr}</p>
+                    <p className="text-xs text-gray-500">kalori/hari</p>
+                  </div>
+
+                  {tdee && (
+                    <div className="text-center p-4 bg-white/50 rounded-xl">
+                      <p className="text-sm text-gray-600 mb-1">
+                        TDEE (Total Pengeluaran)
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800">{tdee}</p>
+                      <p className="text-xs text-gray-500">kalori/hari</p>
+                    </div>
+                  )}
+
+                  {dailyCalories && (
+                    <div className="text-center p-4 bg-gradient-to-r from-orange-100 to-red-100 rounded-xl border-2 border-orange-300">
+                      <p className="text-sm text-gray-600 mb-1">
+                        Target Kalori Harian
+                      </p>
+                      <p className="text-3xl font-black text-orange-700">
+                        {dailyCalories}
+                      </p>
+                      <p className="text-xs text-gray-500">kalori/hari</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                  <p className="text-xs text-gray-600 flex items-center">
+                    <AlertCircle className="h-3 w-3 mr-1 text-yellow-600" />
+                    Kalori dihitung otomatis berdasarkan rumus Mifflin-St Jeor
+                    dan disesuaikan dengan tujuan diet Anda
+                  </p>
                 </div>
               </div>
             )}
@@ -365,22 +496,6 @@ function Profile() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Target Kalori Harian
-                </label>
-                <input
-                  type="number"
-                  name="dailyCalories"
-                  value={profile.dailyCalories}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#F27F34]/50 focus:border-transparent transition-all duration-300"
-                  placeholder="2000"
-                  min="1000"
-                  max="5000"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Tingkat Aktivitas
                 </label>
                 <select
@@ -402,7 +517,7 @@ function Profile() {
                 </select>
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Alergi Makanan
                 </label>
@@ -453,17 +568,21 @@ function Profile() {
           </div>
           <ul className="text-gray-600 text-sm space-y-2">
             <li>
-              • Lengkapi semua informasi untuk rekomendasi yang lebih akurat
+              • Lengkapi semua informasi untuk perhitungan kalori yang akurat
             </li>
             <li>
               • Update berat badan secara berkala untuk tracking yang lebih baik
             </li>
             <li>
-              • Target kalori akan membantu sistem memberikan saran menu yang
-              sesuai
+              • Kalori harian dihitung otomatis berdasarkan BMR dan tingkat
+              aktivitas Anda
             </li>
             <li>
               • Informasi alergi akan membantu filter menu yang aman untuk Anda
+            </li>
+            <li>
+              • Pilih tujuan diet yang sesuai untuk penyesuaian kalori yang
+              tepat
             </li>
           </ul>
         </section>
