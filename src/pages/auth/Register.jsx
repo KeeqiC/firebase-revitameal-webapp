@@ -27,6 +27,7 @@ function Register() {
     setLoading(true);
 
     try {
+      // Kirim displayName sebagai parameter ketiga yang akan disimpan sebagai 'name' di Firestore
       await signup(email, password, displayName);
       navigate("/dashboard");
     } catch (err) {

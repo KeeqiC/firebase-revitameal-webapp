@@ -66,16 +66,21 @@ const useAuth = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // For this admin panel, we can simulate the admin user directly
-      // In a real app, you would have a login system.
-      setCurrentUser({ uid: "x1QFpZjvvBfGLNugPfaXI3eF0zf1" });
+      if (user) {
+        // Jika ada pengguna yang login, set state dengan objek pengguna tersebut.
+        // Objek 'user' dari Firebase sudah berisi 'uid' dan info lainnya.
+        setCurrentUser(user);
+      } else {
+        // Jika tidak ada pengguna yang login (misalnya setelah logout),
+        // set state kembali ke null.
+        setCurrentUser(null);
+      }
     });
-    return unsubscribe;
+    return unsubscribe; // Cleanup listener saat komponen di-unmount
   }, []);
 
   return { currentUser };
 };
-// --- End Mock Setup ---
 
 function DietPlanner() {
   const { currentUser } = useAuth();

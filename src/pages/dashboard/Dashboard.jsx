@@ -27,22 +27,25 @@ const app =
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Mock Auth Context
+// Mock useAuth hook to provide a currentUser object
 const useAuth = () => {
   const [currentUser, setCurrentUser] = useState(null);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // For demonstration, we'll mock a user if none is logged in.
-      // In a real app, you might handle this differently.
       if (user) {
+        // Jika ada pengguna yang login, set state dengan objek pengguna tersebut.
+        // Objek 'user' dari Firebase sudah berisi 'uid' dan info lainnya.
         setCurrentUser(user);
       } else {
-        // Mock user for development purposes
-        setCurrentUser({ uid: "x1QFpZjvvBfGLNugPfaXI3eF0zf1", isMock: true });
+        // Jika tidak ada pengguna yang login (misalnya setelah logout),
+        // set state kembali ke null.
+        setCurrentUser(null);
       }
     });
-    return unsubscribe;
+    return unsubscribe; // Cleanup listener saat komponen di-unmount
   }, []);
+
   return { currentUser };
 };
 

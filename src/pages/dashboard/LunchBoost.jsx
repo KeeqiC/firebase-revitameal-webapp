@@ -40,17 +40,27 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+// Mock useAuth hook to provide a currentUser object
 const useAuth = () => {
   const [currentUser, setCurrentUser] = useState(null);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser({ uid: "x1QFpZjvvBfGLNugPfaXI3eF0zf1" });
+      if (user) {
+        // Jika ada pengguna yang login, set state dengan objek pengguna tersebut.
+        // Objek 'user' dari Firebase sudah berisi 'uid' dan info lainnya.
+        setCurrentUser(user);
+      } else {
+        // Jika tidak ada pengguna yang login (misalnya setelah logout),
+        // set state kembali ke null.
+        setCurrentUser(null);
+      }
     });
-    return unsubscribe;
+    return unsubscribe; // Cleanup listener saat komponen di-unmount
   }, []);
+
   return { currentUser };
 };
-// --- End Mock Setup ---
 
 // Enhanced Vegetable Selection Modal Component
 function VegetableSelectionModal({

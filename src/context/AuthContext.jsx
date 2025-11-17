@@ -15,7 +15,8 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const signup = async (email, password) => {
+  // Tambahkan parameter displayName di sini
+  const signup = async (email, password, displayName) => {
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
@@ -23,13 +24,18 @@ export function AuthProvider({ children }) {
     );
     const user = userCredential.user;
 
+    // Simpan displayName sebagai 'name' di Firestore
     await setDoc(doc(db, "users", user.uid), {
       email: user.email,
-      name: "",
+      name: displayName || "", // Gunakan displayName yang dikirim dari Register
       currentWeight: "",
       targetWeight: "",
       dietGoal: "",
       foodAllergies: "",
+      height: "",
+      age: "",
+      gender: "",
+      activityLevel: "",
     });
     return userCredential;
   };
@@ -60,11 +66,7 @@ export function AuthProvider({ children }) {
     logout,
   };
 
-   return (
-    <AuthContext.Provider value={value}>
-      {children} 
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

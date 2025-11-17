@@ -59,14 +59,23 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+// Mock useAuth hook to provide a currentUser object
 const useAuth = () => {
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser({ uid: "x1QFpZjvvBfGLNugPfaXI3eF0zf1" });
+      if (user) {
+        // Jika ada pengguna yang login, set state dengan objek pengguna tersebut.
+        // Objek 'user' dari Firebase sudah berisi 'uid' dan info lainnya.
+        setCurrentUser(user);
+      } else {
+        // Jika tidak ada pengguna yang login (misalnya setelah logout),
+        // set state kembali ke null.
+        setCurrentUser(null);
+      }
     });
-    return unsubscribe;
+    return unsubscribe; // Cleanup listener saat komponen di-unmount
   }, []);
 
   return { currentUser };
@@ -1170,7 +1179,9 @@ function CalorieTracker() {
                             </div>
                             <div>
                               <div className="flex items-center space-x-2 mb-1">
-                                <h4 className="font-bold text-gray-800">{meal.name}</h4>
+                                <h4 className="font-bold text-gray-800">
+                                  {meal.name}
+                                </h4>
                                 <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
                                   Order #{meal.orderId?.slice(-6)}
                                 </span>
@@ -1183,22 +1194,33 @@ function CalorieTracker() {
                                 </span>
                                 <span className="flex items-center space-x-1">
                                   <Activity className="h-3 w-3" />
-                                  <span>{parseFloat(meal.protein || 0).toFixed(1)}g protein</span>
+                                  <span>
+                                    {parseFloat(meal.protein || 0).toFixed(1)}g
+                                    protein
+                                  </span>
                                 </span>
                                 <span className="flex items-center space-x-1">
                                   <Coffee className="h-3 w-3" />
-                                  <span>{parseFloat(meal.carbs || 0).toFixed(1)}g karbo</span>
+                                  <span>
+                                    {parseFloat(meal.carbs || 0).toFixed(1)}g
+                                    karbo
+                                  </span>
                                 </span>
                                 <span className="flex items-center space-x-1">
                                   <Tag className="h-3 w-3" />
-                                  <span>{parseFloat(meal.fats || 0).toFixed(1)}g lemak</span>
+                                  <span>
+                                    {parseFloat(meal.fats || 0).toFixed(1)}g
+                                    lemak
+                                  </span>
                                 </span>
                                 <span className="text-xs text-gray-400 ml-4">
                                   {meal.timestamp && meal.timestamp.toDate
-                                    ? meal.timestamp.toDate().toLocaleTimeString("id-ID", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })
+                                    ? meal.timestamp
+                                        .toDate()
+                                        .toLocaleTimeString("id-ID", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })
                                     : "Dari pembelian"}
                                 </span>
                               </div>
