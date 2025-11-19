@@ -160,7 +160,7 @@ function OrderHistory() {
   };
 
   const generateWhatsAppMessage = (order) => {
-    const phoneNumber = "62895374087050";
+    const phoneNumber = "6289620284488";
     const message = encodeURIComponent(
       `Halo, saya ingin menanyakan pesanan saya:
 

@@ -2,7 +2,6 @@
 
 import { Instagram, Facebook, Phone, Mail, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
-import TikTokIcon from "./Icons/TikTokIcon";
 import logoRevitameal from "../assets/logoRevitameal.png";
 
 // Data untuk tautan navigasi, mudah diubah di sini
@@ -15,19 +14,9 @@ const footerNavLinks = [
 // Data untuk ikon sosial media
 const socialLinks = [
   {
-    href: "https://instagram.com/revitameal",
+    href: "https://www.instagram.com/revitameal.official?igsh=MTdzNmJ3cHdqMnVsOA==",
     label: "Instagram",
     Icon: Instagram,
-  },
-  {
-    href: "https://facebook.com/Revitameal",
-    label: "Facebook",
-    Icon: Facebook,
-  },
-  {
-    href: "https://tiktok.com/@revitameal",
-    label: "TikTok",
-    Icon: TikTokIcon,
   },
 ];
 
@@ -88,10 +77,10 @@ function Footer() {
               <li className="flex items-center space-x-3 group">
                 <Phone size={18} className="text-[#FFD580]" />
                 <a
-                  href="tel:0895123223141"
+                  href="tel:+6289620284488"
                   className="text-white/80 group-hover:text-white transition-colors"
                 >
-                  0895123223141
+                  +6289620284488
                 </a>
               </li>
               <li className="flex items-center space-x-3 group">
@@ -122,20 +111,7 @@ function Footer() {
             <p className="text-sm text-white/70">
               &copy; {new Date().getFullYear()} Revitameal. All rights reserved.
             </p>
-            <div className="flex items-center space-x-6 text-sm">
-              <Link
-                to="/privacy-policy"
-                className="text-white/70 hover:text-white transition-colors"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                to="/terms-of-service"
-                className="text-white/70 hover:text-white transition-colors"
-              >
-                Terms of Service
-              </Link>
-            </div>
+            <div className="flex items-center space-x-6 text-sm"></div>
           </div>
         </div>
       </div>

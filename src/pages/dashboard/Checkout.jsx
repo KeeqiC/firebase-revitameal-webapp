@@ -262,6 +262,7 @@ function Checkout() {
 
       // 2️⃣ PREPARE PAYLOAD UNTUK DOKU API
       const dokuPayload = {
+        order_id: dokuOrderId,
         gross_amount: Math.round(total),
         // TIDAK PERLU order_id di payload, backend yang generate
         item_details: [

@@ -18,9 +18,6 @@ import {
   query,
   where,
   getDocs,
-  doc,
-  updateDoc,
-  serverTimestamp,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -41,85 +38,45 @@ function PaymentSuccess() {
   const [loading, setLoading] = useState(true);
   const [orderDetails, setOrderDetails] = useState(null);
   const [error, setError] = useState(null);
-  const [isPending, setIsPending] = useState(false);
 
   useEffect(() => {
-    const updateOrderStatus = async () => {
-      try {
-        const orderId = searchParams.get("order_id");
-        const status = searchParams.get("status");
-        const transactionId = searchParams.get("transaction_id");
+    const orderId = searchParams.get("order_id");
+    if (orderId) {
+      fetchOrderData(orderId);
+    } else {
+      setError("Order ID tidak ditemukan di URL");
+      setLoading(false);
+    }
+  }, [searchParams]);
 
-        console.log("=== PAYMENT SUCCESS PAGE ===");
-        console.log("Order ID:", orderId);
-        console.log("Status:", status);
-        console.log("Transaction ID:", transactionId);
+  const fetchOrderData = async (orderId) => {
+    try {
+      const ordersRef = collection(db, "orders");
+      const q = query(ordersRef, where("dokuOrderId", "==", orderId));
+      const querySnapshot = await getDocs(q);
 
-        if (!orderId) {
-          throw new Error("Order ID tidak ditemukan");
-        }
-
-        // Cek apakah status pending
-        const isPendingPayment = status && status.toLowerCase() === "pending";
-        setIsPending(isPendingPayment);
-
-        // Cari order di Firestore berdasarkan dokuOrderId
-        const ordersRef = collection(db, "orders");
-        const q = query(ordersRef, where("dokuOrderId", "==", orderId));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-          throw new Error("Pesanan tidak ditemukan di database");
-        }
-
-        // Ambil order pertama yang match
+      if (!querySnapshot.empty) {
         const orderDoc = querySnapshot.docs[0];
-        const orderData = orderDoc.data();
+        const data = orderDoc.data();
 
-        console.log("✅ Order found in Firebase:", orderDoc.id);
-
-        // ✅ UPDATE STATUS ORDER DI FIRESTORE
-        const newStatus = isPendingPayment ? "pending_payment" : "paid";
-
-        // Prepare update data
-        const updateData = {
-          status: newStatus,
-          paymentStatus: status || "success",
-          updatedAt: serverTimestamp(),
-        };
-
-        // Only add transactionId if provided
-        if (transactionId) {
-          updateData.dokuTransactionId = transactionId;
-        }
-
-        // Only add paidAt if payment is completed (not pending)
-        if (!isPendingPayment) {
-          updateData.paidAt = serverTimestamp();
-        }
-
-        await updateDoc(doc(db, "orders", orderDoc.id), updateData);
-
-        console.log(`✅ Order status updated to: ${newStatus}`);
-
-        // Set order details untuk ditampilkan
         setOrderDetails({
           id: orderDoc.id,
           orderId: orderId,
-          transactionId: transactionId,
-          ...orderData,
-          status: newStatus, // ✅ Update status di state juga
+          ...data,
         });
-      } catch (err) {
-        console.error("❌ Error updating order status:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
+        setError(null);
+      } else {
+        setError("Pesanan tidak ditemukan");
       }
-    };
-
-    updateOrderStatus();
-  }, [searchParams]); // ✅ Remove isPending from dependency
+    } catch (error) {
+      console.error("Error fetching order:", error);
+      setError(
+        error.message || "Terjadi kesalahan saat mengambil data pesanan"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Loading state
   if (loading) {
@@ -128,10 +85,13 @@ function PaymentSuccess() {
         <div className="bg-white/70 backdrop-blur-xl border border-white/30 rounded-3xl shadow-xl p-8 sm:p-12 text-center max-w-md w-full">
           <Loader className="h-16 w-16 text-[#F27F34] animate-spin mx-auto mb-6" />
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3">
-            Memverifikasi Pembayaran
+            Menunggu Konfirmasi Pembayaran
           </h2>
           <p className="text-gray-600 text-sm sm:text-base">
-            Mohon tunggu, kami sedang memproses data pesanan Anda...
+            Mohon tunggu, kami sedang memverifikasi pembayaran Anda...
+          </p>
+          <p className="text-gray-500 text-xs mt-2">
+            Proses ini biasanya memakan waktu 10-30 detik
           </p>
         </div>
       </div>
@@ -150,16 +110,16 @@ function PaymentSuccess() {
           <p className="text-gray-600 text-sm sm:text-base mb-6">{error}</p>
           <div className="space-y-3">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/dashboard/order-history")}
               className="w-full bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white py-3 rounded-full font-semibold hover:shadow-lg transition-all"
             >
-              Kembali ke Dashboard
+              Cek Order History
             </button>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => navigate("/dashboard")}
               className="w-full bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-full font-semibold hover:bg-gray-50 transition-all"
             >
-              Coba Lagi
+              Kembali ke Dashboard
             </button>
           </div>
         </div>
@@ -168,7 +128,7 @@ function PaymentSuccess() {
   }
 
   // Success state - Pending Payment
-  if (isPending) {
+  if (orderDetails?.status === "pending_payment") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#F27F34]/5 via-[#E06B2A]/5 to-[#B23501]/10 flex items-center justify-center p-4">
         <div className="bg-white/70 backdrop-blur-xl border border-white/30 rounded-3xl shadow-xl p-8 sm:p-12 max-w-2xl w-full">
@@ -196,7 +156,7 @@ function PaymentSuccess() {
               <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                 <span className="text-gray-600 font-medium">Total</span>
                 <span className="font-bold text-[#B23501] text-xl">
-                  Rp{orderDetails.pricing?.total?.toLocaleString("id-ID")}
+                  Rp{orderDetails.pricing?.total?.toLocaleString("id-ID") || 0}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -210,8 +170,15 @@ function PaymentSuccess() {
 
           <div className="space-y-3">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/dashboard/order-history")}
               className="w-full bg-gradient-to-r from-[#F27F34] to-[#B23501] text-white py-4 rounded-full font-semibold hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+            >
+              <FileText className="h-5 w-5" />
+              <span>Cek Status Pesanan</span>
+            </button>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="w-full bg-white border-2 border-gray-300 text-gray-700 py-4 rounded-full font-semibold hover:bg-gray-50 transition-all flex items-center justify-center space-x-2"
             >
               <Home className="h-5 w-5" />
               <span>Kembali ke Dashboard</span>
@@ -247,22 +214,12 @@ function PaymentSuccess() {
                 {orderDetails.orderId}
               </span>
             </div>
-            {orderDetails.transactionId && (
-              <div className="flex justify-between items-center pb-3 border-b border-gray-200">
-                <span className="text-gray-600 font-medium">
-                  Transaction ID
-                </span>
-                <span className="font-mono text-sm text-gray-700">
-                  {orderDetails.transactionId}
-                </span>
-              </div>
-            )}
             <div className="flex justify-between items-center pb-3 border-b border-gray-200">
               <span className="text-gray-600 font-medium">
                 Total Pembayaran
               </span>
               <span className="font-bold text-[#B23501] text-2xl">
-                Rp{orderDetails.pricing?.total?.toLocaleString("id-ID")}
+                Rp{orderDetails.pricing?.total?.toLocaleString("id-ID") || 0}
               </span>
             </div>
             <div className="flex justify-between items-center pb-3 border-b border-gray-200">
